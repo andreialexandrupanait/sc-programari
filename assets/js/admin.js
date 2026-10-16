@@ -511,32 +511,33 @@
 				else { input.select(); document.execCommand('copy'); done(); }
 			});
 		});
-		// Setări: o singură secțiune vizibilă; tabul ales rămâne după salvare (hash + memorie locală).
+		// Setări: toate secțiunile rămân la vedere; meniul de sus duce la secțiune și arată unde ești.
 		var settings = document.querySelector('form.scp-settings');
 		if (settings) {
 			var tabs = settings.querySelectorAll('.scp-tabs a');
-			var show = function (id) {
-				if (!settings.querySelector('section#' + id)) id = 'program';
-				settings.querySelectorAll('section.scp-panel').forEach(function (s) { s.hidden = s.id !== id; });
-				tabs.forEach(function (a) {
-					var on = a.getAttribute('href') === '#' + id;
-					a.classList.toggle('is-active', on);
-					a.setAttribute('aria-selected', on ? 'true' : 'false');
-				});
-				try { window.localStorage.setItem('scp_settings_tab', id); } catch (e) { /* ignorăm */ }
+			var sections = Array.prototype.slice.call(settings.querySelectorAll('section.scp-panel'));
+			var setActive = function (id) {
+				tabs.forEach(function (a) { a.classList.toggle('is-active', a.getAttribute('href') === '#' + id); });
 			};
 			tabs.forEach(function (a) {
 				a.addEventListener('click', function (e) {
+					var target = settings.querySelector(a.getAttribute('href'));
+					if (!target) return;
 					e.preventDefault();
-					var id = a.getAttribute('href').slice(1);
-					history.replaceState(null, '', '#' + id);
-					show(id);
-					window.scrollTo({ top: 0 });
+					history.replaceState(null, '', a.getAttribute('href'));
+					var bar = settings.querySelector('.scp-tabs');
+					window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 46, behavior: 'smooth' });
+					setActive(target.id);
 				});
 			});
-			var start = window.location.hash.slice(1);
-			if (!start) { try { start = window.localStorage.getItem('scp_settings_tab') || ''; } catch (e) { start = ''; } }
-			show(start || 'program');
+			var spy = function () {
+				var current = sections[0] ? sections[0].id : '';
+				sections.forEach(function (s) { if (s.getBoundingClientRect().top < 160) current = s.id; });
+				if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4 && sections.length) current = sections[sections.length - 1].id;
+				setActive(current);
+			};
+			window.addEventListener('scroll', spy, { passive: true });
+			spy();
 			// Modificări nesalvate: semn pe bara de jos și avertizare la plecarea de pe pagină.
 			var dirty = false, flag = settings.querySelector('.scp-dirty');
 			var mark = function () { if (!dirty) { dirty = true; if (flag) flag.hidden = false; } };

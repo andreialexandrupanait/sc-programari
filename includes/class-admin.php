@@ -1058,8 +1058,8 @@ class SCP_Admin {
 			<?php wp_nonce_field( 'scp_save_settings' ); ?>
 			<input type="hidden" name="action" value="scp_save_settings">
 
-			<nav class="scp-tabs" role="tablist" aria-label="Secțiuni setări">
-				<a href="#program" role="tab">Program</a><a href="#pachete" role="tab">Pachete</a><a href="#plata" role="tab">Plată și vouchere</a><a href="#emailuri" role="tab">Emailuri</a><a href="#studio" role="tab">Studio</a><a href="#webhook" role="tab">Webhook n8n</a>
+			<nav class="scp-tabs" aria-label="Secțiuni setări">
+				<a href="#program">Program</a><a href="#pachete">Pachete</a><a href="#studio">Studio</a><a href="#emailuri">Emailuri</a><a href="#plata">Plată și vouchere</a><a href="#webhook">Webhook n8n</a>
 			</nav>
 
 			<section class="scp-panel" id="program">
@@ -1164,7 +1164,7 @@ class SCP_Admin {
 			</section>
 
 			<section class="scp-panel" id="plata">
-				<h2>Plată și reduceri</h2>
+				<h2>Plată, reduceri și vouchere</h2>
 				<?php
 				$variations = self::wc_variation_options();
 				$map        = (array) $s['wc_variations'];
