@@ -170,8 +170,6 @@
 					cls += ' pay-' + ps.key + (s.booking.plus ? ' is-plus' : '');
 					content.push(el('span', { class: 'scp-cell-name', text: s.booking.name }));
 					if (s.booking.phone) content.push(el('span', { class: 'scp-cell-line', text: s.booking.phone }));
-					if (s.booking.email) content.push(el('span', { class: 'scp-cell-line', text: s.booking.email }));
-					content.push(el('span', { class: 'scp-cell-meta', text: s.booking.package + ' · ' + ps.short }));
 				} else if (s.state === 'blocked') {
 					content.push(el('span', { class: 'scp-cell-meta', text: s.reason || 'blocat' }));
 				} else if (s.state === 'free') {
