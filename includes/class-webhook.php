@@ -9,6 +9,10 @@ defined( 'ABSPATH' ) || exit;
  * cron-ul reîncearcă la 5, 15, 60 și 180 de minute. Din admin se poate retrimite manual.
  * Un rând e „sending” cât timp e trimis, ca două procese să nu-l trimită de două ori.
  *
+ * Trimiterile pleacă strict una câte una (pump(), cu lock): n8n scrie în Sheet cu „Append or Update”,
+ * iar execuții în paralel își suprascriu rândurile. Webhookul din n8n răspunde după ultimul nod,
+ * deci următoarea trimitere pleacă abia după ce rândul anterior e scris.
+ *
  * Semnătură: X-SCP-Signature = hex( HMAC-SHA256( secret, X-SCP-Timestamp + "." + body ) )
  */
 class SCP_Webhook {
@@ -26,7 +30,7 @@ class SCP_Webhook {
 		add_action( 'scp_payment_link_sent', fn( $b ) => self::emit( 'booking.payment_link_sent', $b ), 30 );
 		add_action( 'scp_voucher_issued', fn( $v ) => self::emit_voucher( 'voucher.issued', $v ), 30 );
 		add_action( 'scp_webhook_retry', array( __CLASS__, 'retry_due' ) );
-		add_action( 'scp_webhook_deliver', array( __CLASS__, 'deliver_ids' ) );
+		add_action( 'scp_webhook_deliver', array( __CLASS__, 'pump' ) );
 		add_action( 'shutdown', array( __CLASS__, 'flush' ), 1 );
 	}
 
@@ -168,7 +172,7 @@ class SCP_Webhook {
 				'status'          => 'pending',
 				'attempts'        => 0,
 				'created_at'      => SCP_Helpers::mysql_now(),
-				'next_attempt_at' => $now ? SCP_Helpers::now()->modify( '+2 minutes' )->format( 'Y-m-d H:i:s' ) : SCP_Helpers::mysql_now(),
+				'next_attempt_at' => SCP_Helpers::mysql_now(),
 			)
 		);
 		if ( $now ) {
@@ -192,6 +196,10 @@ class SCP_Webhook {
 		foreach ( self::all_bookings() as $b ) {
 			self::log_event( 'booking.sync', $b, false );
 			++$n;
+		}
+		// Pornește trimiterea în fundal acum, fără să aștepte cronul.
+		if ( $n && function_exists( 'as_enqueue_async_action' ) && ! as_has_scheduled_action( 'scp_webhook_deliver', array(), 'scp' ) ) {
+			as_enqueue_async_action( 'scp_webhook_deliver', array(), 'scp' );
 		}
 		return $n;
 	}
@@ -266,19 +274,60 @@ class SCP_Webhook {
 		if ( ! self::$queue ) {
 			return;
 		}
-		$ids         = array_values( array_unique( self::$queue ) );
 		self::$queue = array();
 		if ( function_exists( 'as_enqueue_async_action' ) && apply_filters( 'scp_async', true ) ) {
-			as_enqueue_async_action( 'scp_webhook_deliver', array( $ids ), 'scp' );
+			if ( ! as_has_scheduled_action( 'scp_webhook_deliver', array(), 'scp' ) ) {
+				as_enqueue_async_action( 'scp_webhook_deliver', array(), 'scp' );
+			}
 			return;
 		}
-		self::deliver_ids( $ids );
+		self::pump();
 	}
 
-	public static function deliver_ids( $ids ): void {
-		foreach ( (array) $ids as $id ) {
-			self::deliver( (int) $id );
+	/**
+	 * Trimite, în ordine și una câte una, tot ce e de trimis (evenimente noi, reîncercări, resincronizare).
+	 * Un singur proces o dată (lock); cel mult ~45 de secunde pe rulare; se oprește după 3 eșecuri la rând.
+	 * Dacă mai rămân rânduri, programează încă o rulare în fundal.
+	 */
+	public static function pump(): void {
+		global $wpdb;
+		if ( ! add_option( 'scp_webhook_lock', time(), '', false ) ) {
+			if ( (int) get_option( 'scp_webhook_lock' ) > time() - 120 ) {
+				return; // trimite deja alt proces; el preia și rândurile noi
+			}
+			update_option( 'scp_webhook_lock', time(), false ); // lock rămas de la un proces căzut
 		}
+		$table = SCP_Install::table( 'webhook_log' );
+		$left  = false;
+		try {
+			$start = microtime( true );
+			$fails = 0;
+			while ( microtime( true ) - $start < 45 && $fails < 3 ) {
+				$id = (int) $wpdb->get_var(
+					$wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','sending') AND next_attempt_at <= %s ORDER BY id LIMIT 1", SCP_Helpers::mysql_now() )
+				);
+				if ( ! $id ) {
+					break;
+				}
+				update_option( 'scp_webhook_lock', time(), false );
+				$r     = self::deliver( $id );
+				$fails = $r['ok'] ? 0 : $fails + 1;
+				if ( null === $r['code'] && 'Se trimite deja.' === $r['error'] ) {
+					break;
+				}
+			}
+			$left = $fails < 3 && (bool) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status IN ('pending','sending') AND next_attempt_at <= %s", SCP_Helpers::mysql_now() ) );
+		} finally {
+			delete_option( 'scp_webhook_lock' );
+		}
+		if ( $left && function_exists( 'as_enqueue_async_action' ) && apply_filters( 'scp_async', true ) && ! as_has_scheduled_action( 'scp_webhook_deliver', array(), 'scp' ) ) {
+			as_enqueue_async_action( 'scp_webhook_deliver', array(), 'scp' );
+		}
+	}
+
+	/** Compatibilitate: joburile programate de 1.3.0–1.3.4 aveau lista de id-uri ca argument. */
+	public static function deliver_ids( $ids = array() ): void {
+		self::pump();
 	}
 
 	/** @return array{ok:bool,code:int|null,error:string} */
@@ -313,7 +362,7 @@ class SCP_Webhook {
 		$res = wp_remote_post(
 			$url,
 			array(
-				'timeout'   => 5,
+				'timeout'   => 30, // n8n răspunde după ce a scris în Sheet
 				'blocking'  => true,
 				'headers'   => array(
 					'Content-Type'    => 'application/json; charset=utf-8',
@@ -363,30 +412,7 @@ class SCP_Webhook {
 	 * iar rulările nu au voie să se suprapună); se oprește după 3 eșecuri la rând, când n8n e căzut.
 	 */
 	public static function retry_due(): void {
-		global $wpdb;
-		if ( ! add_option( 'scp_webhook_lock', time(), '', false ) ) {
-			if ( (int) get_option( 'scp_webhook_lock' ) > time() - 120 ) {
-				return;
-			}
-			update_option( 'scp_webhook_lock', time(), false );
-		}
-		try {
-			$table = SCP_Install::table( 'webhook_log' );
-			$ids   = $wpdb->get_col(
-				$wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','sending') AND next_attempt_at <= %s ORDER BY id LIMIT 60", SCP_Helpers::mysql_now() )
-			);
-			$start = microtime( true );
-			$fails = 0;
-			foreach ( $ids as $id ) {
-				if ( microtime( true ) - $start > 40 || $fails >= 3 ) {
-					break;
-				}
-				$r     = self::deliver( (int) $id );
-				$fails = $r['ok'] || null === $r['code'] && 'Se trimite deja.' === $r['error'] ? 0 : $fails + 1;
-			}
-		} finally {
-			delete_option( 'scp_webhook_lock' );
-		}
+		self::pump();
 	}
 
 	/** Trimite un eveniment de test, cu o programare fictivă marcată clar ca test. */

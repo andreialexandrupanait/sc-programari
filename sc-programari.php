@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.3.4
+ * Version:           1.3.5
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -24,7 +24,7 @@ if ( defined( 'SCP_VERSION' ) ) {
 	return;
 }
 
-define( 'SCP_VERSION', '1.3.4' );
+define( 'SCP_VERSION', '1.3.5' );
 define( 'SCP_DB_VERSION', '7' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
@@ -98,8 +98,9 @@ add_action(
 		add_action( 'wp_head', array( 'SCP_Admin', 'admin_bar_css' ) );
 		add_action( 'admin_head', array( 'SCP_Admin', 'admin_bar_css' ) );
 		add_action( 'scp_webhook_retry', array( 'SCP_Bookings', 'sweep' ), 5 );
-		// Expirările rulează din cron (pe live, cronul serverului, în fiecare minut). Doar dacă cronul a rămas
-		// în urmă cu peste 10 minute, le rulează un vizitator, după ce a primit pagina, cel mult o dată la 5 minute.
+		// Expirările și trimiterile spre Sheet rulează din cron (pe live, cronul serverului, în fiecare minut).
+		// Dacă cronul a rămas în urmă cu peste 10 minute (sau nu rulează deloc), le rulează un vizitator,
+		// după ce a primit pagina, cel mult o dată la 5 minute.
 		add_action(
 			'shutdown',
 			static function () {
@@ -112,6 +113,7 @@ add_action(
 					fastcgi_finish_request();
 				}
 				SCP_Bookings::sweep();
+				SCP_Webhook::pump(); // și trimiterile către Sheet, care altfel ar aștepta cronul
 			},
 			20
 		);

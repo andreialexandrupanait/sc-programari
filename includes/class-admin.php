@@ -1612,7 +1612,7 @@ class SCP_Admin {
 		$msg    = get_transient( 'scp_resync_msg_' . get_current_user_id() );
 		if ( false !== $msg ) {
 			delete_transient( 'scp_resync_msg_' . get_current_user_id() );
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( (int) $msg . ' programări puse la coadă. Pleacă în fundal, câte 60 la fiecare rulare a cronului (la 5 minute).' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( (int) $msg . ' programări puse la coadă. Pleacă în fundal, una câte una (câteva secunde fiecare); reîncarcă pagina ca să vezi progresul.' ) . '</p></div>';
 		}
 		?>
 		<p class="scp-lead">Fiecare programare are un rând în Sheet, găsit după <strong>Cod</strong>. Rândul se actualizează la orice schimbare: plată, mutare, anulare, expirare, date de contact, observații. O programare anulată rămâne în Sheet cu statusul „Anulată”, iar cea nouă de pe aceeași oră apare pe alt rând, cu alt cod.</p>
