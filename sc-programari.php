@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.3.0
+ * Version:           1.3.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -24,7 +24,7 @@ if ( defined( 'SCP_VERSION' ) ) {
 	return;
 }
 
-define( 'SCP_VERSION', '1.3.0' );
+define( 'SCP_VERSION', '1.3.1' );
 define( 'SCP_DB_VERSION', '7' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
@@ -62,6 +62,23 @@ add_action(
 		}
 	}
 );
+
+/*
+ * Mu-plugin-ul de securitate SimpleAD scoate „?ver=” din toate fișierele CSS/JS (ca să ascundă versiunile).
+ * Fără versiune în URL, după un update browserul și Cloudflare servesc fișierele vechi ale pluginului.
+ * Pentru fișierele noastre punem înapoi un parametru propriu, după filtrul lor (prioritatea 10).
+ */
+$scp_bust = static function ( $src ) {
+	if ( ! is_string( $src ) || ! str_contains( $src, '/plugins/sc-programari/assets/' ) ) {
+		return $src;
+	}
+	$path = SCP_DIR . 'assets/' . explode( '/plugins/sc-programari/assets/', strtok( $src, '?' ), 2 )[1];
+	$v    = SCP_VERSION . ( is_file( $path ) ? '.' . filemtime( $path ) : '' );
+	return add_query_arg( 'scpv', $v, $src );
+};
+add_filter( 'style_loader_src', $scp_bust, 99 );
+add_filter( 'script_loader_src', $scp_bust, 99 );
+unset( $scp_bust );
 
 add_action(
 	'plugins_loaded',
