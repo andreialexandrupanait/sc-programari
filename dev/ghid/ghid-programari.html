@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghid programări Crăciun</title>
+<style>
+	:root {
+		--g: #2d661b; --g-deep: #1f3a17; --g-soft: #e7eee3;
+		--gold: #cfab62; --gold-soft: #f7efdc;
+		--red: #e5322d; --red-soft: #fdecea;
+		--ink: #23211d; --muted: #6f685c; --line: #e2ddd2; --sand: #f6f3ec;
+	}
+	* { box-sizing: border-box; }
+	html { -webkit-text-size-adjust: 100%; }
+	body { margin: 0; background: #fff; color: var(--ink); font: 17px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
+	.wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 80px; }
+	header.cover { background: var(--g-deep); color: #fff; padding: 64px 24px 56px; }
+	header.cover .wrap { padding-bottom: 0; }
+	header.cover h1 { font-size: 40px; line-height: 1.15; margin: 0 0 12px; }
+	header.cover p { margin: 0; font-size: 19px; color: #d9e6d2; max-width: 680px; }
+	header.cover .meta { margin-top: 26px; font-size: 14px; color: var(--gold); letter-spacing: .04em; text-transform: uppercase; }
+	h2 { font-size: 28px; line-height: 1.25; margin: 64px 0 14px; padding-top: 10px; border-top: 3px solid var(--g); }
+	h2 .n { display: inline-block; min-width: 42px; height: 42px; margin-right: 12px; border-radius: 10px; background: var(--g); color: #fff; text-align: center; line-height: 42px; font-size: 22px; vertical-align: 2px; }
+	h3 { font-size: 20px; margin: 30px 0 8px; }
+	p { margin: 0 0 14px; }
+	a { color: var(--g); }
+	.toc { background: var(--sand); border-radius: 14px; padding: 22px 28px; margin: 36px 0 0; columns: 2; column-gap: 40px; }
+	.toc h2 { border: 0; margin: 0 0 10px; padding: 0; font-size: 20px; column-span: all; }
+	.toc ol { margin: 0; padding-left: 22px; }
+	.toc li { margin: 3px 0; break-inside: avoid; }
+	figure { margin: 22px 0 10px; }
+	figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 22px rgba(30, 25, 15, .10); }
+	figure.narrow img { max-width: 480px; margin: 0 auto; }
+	figure.small img { max-width: 420px; margin: 0 auto; }
+	figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; text-align: center; }
+	ol.marks { list-style: none; padding: 0; margin: 14px 0 22px; counter-reset: m; }
+	ol.marks > li { position: relative; padding: 6px 0 6px 46px; border-bottom: 1px dashed var(--line); }
+	ol.marks > li:last-child { border-bottom: 0; }
+	ol.marks > li::before { counter-increment: m; content: counter(m); position: absolute; left: 0; top: 6px; width: 30px; height: 30px; border-radius: 50%; background: var(--red); color: #fff; font-weight: 700; font-size: 15px; text-align: center; line-height: 30px; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--red); }
+	ol.marks.start5 { counter-reset: m 4; }
+	ol.marks ul { margin: 6px 0 0; padding-left: 20px; }
+	ol.marks ul li { margin: 4px 0; }
+	ol.steps { padding-left: 22px; margin: 10px 0 18px; }
+	ol.steps li { margin: 6px 0; }
+	.box { border-radius: 12px; padding: 16px 20px; margin: 18px 0; }
+	.tip { background: var(--g-soft); border-left: 5px solid var(--g); }
+	.warn { background: var(--gold-soft); border-left: 5px solid var(--gold); }
+	.stop { background: var(--red-soft); border-left: 5px solid var(--red); }
+	.box strong:first-child { display: block; margin-bottom: 2px; }
+	.ui { display: inline-block; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 15px; font-weight: 600; white-space: nowrap; }
+	.path { font-weight: 600; color: var(--g-deep); }
+	table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 16px; }
+	th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+	th { background: var(--sand); font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+	.sw { display: inline-block; width: 18px; height: 18px; border-radius: 4px; vertical-align: -3px; margin-right: 6px; border: 1px solid #cfc8b8; }
+	.sw.paid { background: var(--g); border-color: var(--g); }
+	.sw.studio { background: var(--g-soft); border-color: #b9cfae; }
+	.sw.await { background: var(--gold-soft); border-color: var(--gold); }
+	.sw.free { background: #fff; }
+	.sw.blocked { background: repeating-linear-gradient(135deg, #f6f2ea 0 4px, #ece5d7 4px 8px); }
+	.flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0 24px; }
+	.flow div { background: var(--sand); border-radius: 12px; padding: 14px; font-size: 15px; }
+	.flow b { display: block; color: var(--g-deep); margin-bottom: 4px; font-size: 16px; }
+	.faq h3 { margin-top: 24px; }
+	footer { margin-top: 70px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+	@media (max-width: 700px) {
+		body { font-size: 16px; }
+		header.cover h1 { font-size: 30px; }
+		.toc { columns: 1; }
+		.flow { grid-template-columns: 1fr 1fr; }
+		h2 { font-size: 23px; }
+		.ui { white-space: normal; }
+		table { font-size: 14px; }
+		th, td { padding: 8px 6px; }
+	}
+	@media print {
+		@page { size: A4; margin: 14mm 13mm 16mm; }
+		@page :first { margin: 0; }
+		body { font-size: 11.5pt; }
+		header.cover { height: 296mm; padding: 0 18mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+		header.cover h1 { font-size: 34pt; }
+		figure { margin: 10px 0 6px; }
+		figure img { max-height: 105mm; width: auto; max-width: 100%; margin: 0 auto; }
+		figure.narrow img, figure.small img { max-height: 95mm; }
+		ol.marks { margin: 8px 0 12px; }
+		ol.marks > li { padding: 3px 0 3px 40px; }
+		ol.marks > li::before { top: 3px; }
+		ol.marks > li { break-inside: avoid; }
+		table { margin: 8px 0 12px; }
+		th, td { padding: 6px 10px; }
+		.box { margin: 10px 0; padding: 10px 16px; }
+		footer { margin-top: 16px; padding-top: 8px; }
+		figure.compact img { max-height: 78mm; }
+		.faq h3 { margin: 12px 0 2px; font-size: 13pt; }
+		.faq p { margin-bottom: 6px; }
+		.wrap { max-width: none; padding: 0; }
+		h2 { break-before: page; margin-top: 0; }
+		.toc h2 { break-before: auto; }
+		figure, .box, table, .flow { break-inside: avoid; }
+		figure img { box-shadow: none; }
+		* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+		a { color: inherit; text-decoration: none; }
+	}
+</style>
+</head>
+<body>
+
+<header class="cover">
+	<div class="wrap">
+		<h1>Programările de Crăciun<br>pe stefanchelmu.ro</h1>
+		<p>Ghid pentru Ștefan: cum intri, unde găsești programările, cum le verifici, le muți, încasezi și ce faci după ședință, până la livrarea fotografiilor.</p>
+		<div class="meta">Sezonul 2026 · 1 noiembrie – 24 decembrie</div>
+	</div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+	<h2>Cuprins</h2>
+	<ol>
+		<li><a href="#pe-scurt">Pe scurt: cum funcționează</a></li>
+		<li><a href="#login">Cum intri în site</a></li>
+		<li><a href="#panou">Panoul: ce ai azi și mâine</a></li>
+		<li><a href="#calendar">Calendarul: vezi și verifici o programare</a></li>
+		<li><a href="#mutare">Muți o programare pe altă oră</a></li>
+		<li><a href="#blocari">Ore libere, ore blocate, zile închise</a></li>
+		<li><a href="#cautare">Cauți o programare după nume sau telefon</a></li>
+		<li><a href="#fisa">Fișa completă: modifici orice</a></li>
+		<li><a href="#telefon">Faci tu o programare (la telefon)</a></li>
+		<li><a href="#plati">Plățile, pe înțeles</a></li>
+		<li><a href="#vouchere">Voucherele cadou</a></li>
+		<li><a href="#mesaje">Ce primește clientul (email și SMS)</a></li>
+		<li><a href="#sedinta">Ziua ședinței și livrarea</a></li>
+		<li><a href="#sheet">Copia din Google Sheet</a></li>
+		<li><a href="#intrebari">Situații frecvente</a></li>
+	</ol>
+</nav>
+
+<!-- 1 -->
+<h2 id="pe-scurt"><span class="n">1</span>Pe scurt: cum funcționează</h2>
+<p>Clienții își aleg singuri ziua, ora și pachetul pe pagina <span class="path">stefanchelmu.ro/sedinte-foto-de-craciun</span>. Ora se blochează pe loc, ca nimeni altcineva să n-o mai poată lua.</p>
+<div class="flow">
+	<div><b>1. Se programează</b>Pe site sau la telefon, prin tine.</div>
+	<div><b>2. Plătește</b>Online, cu linkul primit, sau la studio, cash ori card.</div>
+	<div><b>3. Primește mesaje</b>Confirmare, apoi reamintiri cu o zi și cu o oră înainte.</div>
+	<div><b>4. Vine la studio</b>Faci ședința, apoi livrezi fotografiile.</div>
+</div>
+<p>Tu ai nevoie de un singur loc: meniul <span class="ui">Programări</span> din site. Acolo vezi cine vine, cine a plătit și cine nu, și poți schimba orice.</p>
+<div class="box tip"><strong>Regula de aur</strong>Programările se fac și se schimbă doar din site, nu din Google Sheet. Sheet-ul e doar o copie de siguranță, care se actualizează singură.</div>
+
+<!-- 2 -->
+<h2 id="login"><span class="n">2</span>Cum intri în site</h2>
+<ol class="steps">
+	<li>Deschide în browser, pe calculator sau pe telefon, adresa <span class="path">stefanchelmu.ro/wp-admin</span>.</li>
+	<li>Scrie numele de utilizator și parola ta, apoi apasă <span class="ui">Autentificare</span>.</li>
+</ol>
+<figure class="small">
+	<img src="img/01-login.jpg" alt="Ecranul de autentificare">
+	<figcaption>Ecranul de autentificare</figcaption>
+</figure>
+<ol class="marks">
+	<li>Numele de utilizator (sau emailul).</li>
+	<li>Parola.</li>
+	<li>Butonul <span class="ui">Autentificare</span>. Bifează „Ține-mă minte” pe telefonul tău, ca să nu mai scrii parola de fiecare dată.</li>
+</ol>
+<div class="box warn"><strong>Dacă apare „Verificăm că ești om”</strong>Pagina albă de la Cloudflare dispare singură după câteva secunde. Dacă cere să bifezi o căsuță, bifeaz-o.</div>
+
+<!-- 3 -->
+<h2 id="panou"><span class="n">3</span>Panoul: ce ai azi și mâine</h2>
+<p>După ce intri, mergi în meniul din stânga la <span class="ui">Programări</span>. Prima pagină, <b>Panou</b>, îți arată dintr-o privire ce ai de făcut.</p>
+<figure>
+	<img src="img/02-panou.jpg" alt="Panoul programărilor">
+	<figcaption>Panou: ședințele de azi și de mâine, plus cine încă n-a plătit</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Meniul Programări</b>, cu toate paginile: Panou, Programare rapidă, Toate programările, Calendar, Vouchere cadou.</li>
+	<li><b>Azi și mâine</b>: cine vine, la ce oră, ce pachet are și dacă a plătit.</li>
+	<li><b>Cash / Card</b>: apasă când clientul îți plătește la studio. Programarea devine „Plătită”, iar butoanele dispar.</li>
+	<li><b>Așteaptă plata online</b>: rezervări făcute pe site și încă neplătite, cu termenul limită și telefonul. Dacă nu plătesc până la termen, se anulează singure, iar ora se eliberează.</li>
+	<li><b>+ Programare</b>: faci tu o programare nouă, de exemplu când te sună cineva (vezi <a href="#telefon">capitolul 9</a>).</li>
+	<li><b>Programare</b> în bara neagră de sus: ajungi la programarea rapidă de pe orice pagină a site-ului, chiar și de pe telefon.</li>
+</ol>
+
+<!-- 4 -->
+<h2 id="calendar"><span class="n">4</span>Calendarul: vezi și verifici o programare</h2>
+<p>Mergi la <span class="path">Programări → Calendar și blocări</span>. Vezi fiecare zi cu orele ei, iar în fiecare căsuță ocupată, numele și telefonul clientului. Apasă pe o căsuță: în dreapta apar toate detaliile și ce poți face.</p>
+<figure>
+	<img src="img/03-calendar.jpg" alt="Calendarul cu panoul de detalii">
+	<figcaption>Calendarul: apeși pe o oră, iar în dreapta apar detaliile</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Luna</b>: săgețile ‹ › te duc la luna anterioară sau următoare.</li>
+	<li><b>O programare</b>: apasă pe căsuță ca s-o deschizi.</li>
+	<li><b>Panoul din dreapta</b>: numele, statusul plății, pachetul, prețul, mesajul clientului, codul.</li>
+	<li><b>Telefonul și emailul</b>: pe telefon, apeși pe număr și suni direct.</li>
+	<li><b>Mută pe altă zi sau oră</b> (vezi <a href="#mutare">capitolul 5</a>).</li>
+	<li><b>Cash / Card</b>: marchezi plata făcută la studio.</li>
+	<li><b>Anulează programarea</b>: ora se eliberează pe site. Bifa „Anunță clientul pe email” îi trimite clientului un email.</li>
+	<li><b>Legenda culorilor</b> (vezi tabelul de mai jos).</li>
+	<li><b>⋯ lângă zi</b>: închizi toată ziua sau adaugi o oră în plus (vezi <a href="#blocari">capitolul 6</a>).</li>
+</ol>
+<table>
+	<tr><th>Culoarea căsuței</th><th>Ce înseamnă</th></tr>
+	<tr><td><span class="sw paid"></span>Verde închis</td><td>Plătită (online, cash, card sau cu voucher). E sigură.</td></tr>
+	<tr><td><span class="sw studio"></span>Verde deschis</td><td>Confirmată, plătește la studio. Încasezi cu <span class="ui">Cash</span> sau <span class="ui">Card</span> când vine.</td></tr>
+	<tr><td><span class="sw await"></span>Galben</td><td>Așteaptă plata online. Dacă nu plătește până la termen, se anulează singură.</td></tr>
+	<tr><td><span class="sw free"></span>Albă „liber”</td><td>Oră liberă: o poate lua oricine de pe site.</td></tr>
+	<tr><td><span class="sw blocked"></span>Hașurată</td><td>Oră blocată de tine: nu apare pe site.</td></tr>
+</table>
+<div class="box tip"><strong>Butoanele din panou</strong><b>Trece pe plată la studio</b> apare la cei care așteaptă plata online, dacă ți-au spus că plătesc la tine. Programarea se confirmă și nu se mai anulează singură. <b>Deschide fișa completă</b> te duce la toate detaliile, unde poți modifica orice (vezi <a href="#fisa">capitolul 8</a>).</div>
+
+<!-- 5 -->
+<h2 id="mutare"><span class="n">5</span>Muți o programare pe altă oră</h2>
+<p>Când un client te roagă să-i schimbi ora, chiar dacă a plătit deja:</p>
+<figure class="narrow">
+	<img src="img/04-mutare.jpg" alt="Mutarea unei programări">
+	<figcaption>Mutarea din panoul calendarului</figcaption>
+</figure>
+<ol class="marks">
+	<li>În calendar, deschide programarea și apasă <span class="ui">Mută pe altă zi sau oră</span>.</li>
+	<li>Alege <b>noua zi</b>.</li>
+	<li>Apar doar <b>orele libere</b> din ziua aleasă. Apasă pe cea dorită.</li>
+	<li>Lasă bifat <b>Anunță clientul</b>: primește email și SMS cu noua oră.</li>
+	<li>Apasă butonul verde <span class="ui">Mută pe …</span>. Gata.</li>
+</ol>
+<div class="box tip"><strong>Ce se întâmplă automat</strong>Plata rămâne așa cum era. Reamintirile se mută pe noua oră. Vechea oră se eliberează pe site. Copia din Google Sheet se actualizează singură.</div>
+
+<!-- 6 -->
+<h2 id="blocari"><span class="n">6</span>Ore libere, ore blocate, zile închise</h2>
+<figure>
+	<img src="img/05-ora-libera.jpg" alt="O oră liberă în calendar">
+	<figcaption>Apeși pe o oră liberă</figcaption>
+</figure>
+<ol class="marks">
+	<li>Apasă pe o oră <b>liberă</b> din calendar.</li>
+	<li><b>Programare nouă pe această oră</b>: deschide programarea rapidă cu ziua și ora deja alese.</li>
+	<li><b>Blochează ora</b>: ora nu mai apare pe site, de exemplu dacă ai altceva atunci. Motivul e opțional și îl vezi doar tu. Ca s-o deschizi din nou, apasă pe ea și alege <span class="ui">Deblochează ora</span>.</li>
+</ol>
+<h3>Închizi o zi întreagă sau adaugi o oră în plus</h3>
+<p>Apasă pe <b>⋯</b> de lângă numele zilei (marcajul 9 din calendar):</p>
+<ul>
+	<li><span class="ui">Închide toată ziua</span>: ziua dispare de pe site. Programările deja făcute rămân valabile.</li>
+	<li><span class="ui">Adaugă ora</span>: o oră în plus doar în ziua aceea, de exemplu 10:30.</li>
+</ul>
+
+<!-- 7 -->
+<h2 id="cautare"><span class="n">7</span>Cauți o programare după nume sau telefon</h2>
+<p>Mergi la <span class="path">Programări → Toate programările</span>.</p>
+<figure>
+	<img src="img/06-lista.jpg" alt="Lista programărilor">
+	<figcaption>Toate programările, cu filtre și căutare</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Filtrele rapide</b>: <i>Următoare</i> (ce urmează), <i>Așteaptă plata</i>, <i>De încasat la studio</i>, <i>Trecute</i>, <i>Anulate</i>, <i>Toate</i>.</li>
+	<li><b>Căutarea</b>: scrie o parte din nume, telefon, email sau codul programării, apoi apasă <span class="ui">Caută</span>.</li>
+	<li><b>Apasă pe un rând</b> ca să deschizi fișa completă.</li>
+	<li><b>Export CSV</b>: descarci lista într-un fișier pe care îl deschizi în Excel.</li>
+</ol>
+
+<!-- 8 -->
+<h2 id="fisa"><span class="n">8</span>Fișa completă: modifici orice</h2>
+<p>Fișa se deschide din calendar (<span class="ui">Deschide fișa completă</span>) sau din listă (apeși pe rând).</p>
+<figure>
+	<img src="img/07-fisa-sus.jpg" alt="Fișa programării, partea de sus">
+	<figcaption>Fișa programării, partea de sus</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Data și ora</b> ședinței. Pentru mutare, e mai simplu din calendar (capitolul 5).</li>
+	<li><b>Pachetul</b>: dacă clientul vrea alt pachet, alegi aici. Prețul se recalculează singur.</li>
+	<li><b>Datele clientului</b>: nume, telefon, email. Corectezi aici o greșeală de scriere.</li>
+	<li><b>Observații interne</b>: notițele tale (copii, animal, ținute). Clientul nu le vede.</li>
+	<li><b>Rezumatul</b>: ziua, statusul plății, codul, de unde a venit, termenul de plată.</li>
+	<li><b>Plată online</b>: linkul de plată al clientului. <span class="ui">Copiază</span>, ca să i-l trimiți pe WhatsApp, sau <span class="ui">Retrimite linkul pe email</span>.</li>
+	<li><b>Încasat la studio</b>: <span class="ui">Cash</span> sau <span class="ui">Card</span>.</li>
+</ol>
+<figure>
+	<img src="img/08-fisa-jos.jpg" alt="Fișa programării, partea de jos">
+	<figcaption>Fișa programării, partea de jos: statusul și salvarea</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Status programare</b>: Așteaptă plata, Confirmată, <b>Finalizată</b> (după ședință), <b>Neprezentat</b> (n-a venit), Anulată.</li>
+	<li><b>Status plată</b>: se schimbă singur la plată. Îl modifici doar în cazuri speciale.</li>
+	<li><b>Anunță clientul pe email</b> dacă muți sau anulezi programarea.</li>
+	<li><span class="ui">Salvează modificările</span>: nimic nu se schimbă până nu apeși aici.</li>
+	<li><span class="ui">Prelungește termenul cu 24 de ore</span>: când clientul îți cere puțin timp în plus să plătească online.</li>
+	<li><span class="ui">Anulează programarea</span>: ora se eliberează pe site.</li>
+</ol>
+
+<!-- 9 -->
+<h2 id="telefon"><span class="n">9</span>Faci tu o programare (la telefon)</h2>
+<p>Când te sună sau îți scrie cineva: apasă <span class="ui">+ Programare</span> (în bara neagră de sus sau în Panou). Merge la fel și de pe telefon.</p>
+<figure class="compact">
+	<img src="img/09-rapida-1.jpg" alt="Programare rapidă, pașii 1–4">
+	<figcaption>Programare rapidă: ziua, ora, pachetul, clientul</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Ziua</b>: apar doar zilele cu ore libere. Sub fiecare zi vezi câte ore mai sunt.</li>
+	<li><b>Ora</b>: doar orele libere din ziua aleasă.</li>
+	<li><b>Pachetul</b>, cu prețul de azi (inclusiv reducerea, dacă e în perioada ei).</li>
+	<li><b>Clientul</b>: nume și telefon. Cere-i și emailul, ca să primească și confirmarea pe email.</li>
+</ol>
+<figure class="compact">
+	<img src="img/10-rapida-2.jpg" alt="Programare rapidă, plata și salvarea">
+	<figcaption>Cum plătește clientul, apoi salvezi</figcaption>
+</figure>
+<ol class="marks start5">
+	<li><b>Cum plătește</b>:
+		<ul>
+			<li><b>Online, cu link</b>: primește linkul pe SMS și pe email. Dacă nu plătește în termen, programarea se anulează singură.</li>
+			<li><b>La studio, cash sau card</b>: e confirmată direct, fără termen. Încasezi când vine.</li>
+			<li><b>Voucher cadou</b>: scrii codul voucherului și programarea e plătită integral.</li>
+		</ul>
+	</li>
+	<li><span class="ui">Salvează programarea</span>.</li>
+</ol>
+<figure class="compact">
+	<img src="img/11-rapida-gata.jpg" alt="Programarea a fost salvată">
+	<figcaption>Gata: programarea e salvată, iar ora e blocată pe site</figcaption>
+</figure>
+<ol class="marks">
+	<li><span class="ui">Încă o programare</span>, dacă mai ai de pus pe cineva.</li>
+	<li><span class="ui">Deschide fișa</span>, ca să vezi sau să modifici programarea abia făcută.</li>
+</ol>
+<div class="box warn"><strong>Dacă cineva tocmai a luat ora pe site</strong>Apare mesajul „ora tocmai a fost ocupată”, iar orele se reîncarcă. Alege altă oră.</div>
+
+<!-- 10 -->
+<h2 id="plati"><span class="n">10</span>Plățile, pe înțeles</h2>
+<table>
+	<tr><th>Cum plătește</th><th>Ce se întâmplă</th><th>Ce faci tu</th></tr>
+	<tr><td><b>Online, cu cardul</b></td><td>Primește linkul de plată pe email și SMS. Are un termen. Dacă plătește, devine „Plătită online”. Dacă nu, se anulează singură la termen, primește un email, iar ora se eliberează.</td><td>Nimic. Dacă îți cere timp în plus: <span class="ui">Prelungește termenul cu 24 de ore</span>. Dacă vrea să plătească la tine: <span class="ui">Trece pe plată la studio</span>.</td></tr>
+	<tr><td><b>La studio</b></td><td>Programarea e confirmată, fără termen. Apare în „De încasat la studio”.</td><td>Când îți plătește, apeși <span class="ui">Cash</span> sau <span class="ui">Card</span>.</td></tr>
+	<tr><td><b>Voucher cadou</b></td><td>E plătită integral din voucher.</td><td>Nimic.</td></tr>
+</table>
+<div class="box tip"><strong>Reducerea de început de sezon</strong>Se aplică automat celor care rezervă până la data din setări. Prețul rămâne cel de la rezervare, chiar dacă plătesc mai târziu, în termen.</div>
+
+<!-- 11 -->
+<h2 id="vouchere"><span class="n">11</span>Voucherele cadou</h2>
+<p>Cine cumpără un voucher de pe site primește pe email un cod (de forma <b>CHELMU-BRAD-K7MP9Q</b>), pe care îl dă cadou. Cel care primește codul îl introduce la programare și nu mai plătește nimic. Toate le vezi în <span class="path">Programări → Vouchere cadou</span>.</p>
+<figure>
+	<img src="img/12-vouchere.jpg" alt="Voucherele cadou">
+	<figcaption>Voucherele: cumpărătorul, pentru cine e, statusul</figcaption>
+</figure>
+<ol class="marks">
+	<li><b>Căutare</b> după cod, nume, email sau telefon.</li>
+	<li><b>Voucherul</b>: codul, pachetul, cine l-a cumpărat (cu telefon), pentru cine e și până când e valabil.</li>
+	<li><span class="ui">Retrimite emailul</span>: dacă cumpărătorul n-a primit sau a pierdut codul.</li>
+	<li><b>Voucher emis manual</b>: când vinzi un voucher la studio, cash, sau oferi unul cadou. Alegi pachetul, scrii cumpărătorul și apeși <span class="ui">Emite voucherul</span>. Dacă îi scrii și emailul, primește codul pe email.</li>
+</ol>
+<div class="box tip"><strong>Reguli</strong>Un voucher se folosește o singură dată, doar pentru pachetul cumpărat, până la finalul sezonului. Dacă programarea făcută cu voucher se anulează, voucherul redevine valabil.</div>
+
+<!-- 12 -->
+<h2 id="mesaje"><span class="n">12</span>Ce primește clientul (email și SMS)</h2>
+<p>Totul pleacă singur, nu trebuie să trimiți tu nimic. SMS-urile vin de la un număr scurt și se încheie cu „- Stefan Chelmu”, ca oamenii să știe de la cine sunt.</p>
+<table>
+	<tr><th>Când</th><th>Ce primește</th></tr>
+	<tr><td>La rezervare, cu plata online</td><td>Email și SMS cu linkul de plată și termenul.</td></tr>
+	<tr><td>La plată (online, cash, card) sau rezervare la studio / cu voucher</td><td>Confirmarea, cu ziua, ora și adresa studioului.</td></tr>
+	<tr><td>Când muți ședința (cu „Anunță clientul”)</td><td>Email și SMS cu noua oră.</td></tr>
+	<tr><td>Cu o zi înainte, seara</td><td>SMS de reamintire.</td></tr>
+	<tr><td>Cu o oră înainte</td><td>SMS cu locația pe hartă și telefonul studioului.</td></tr>
+	<tr><td>Dacă nu plătește în termen</td><td>Email că rezervarea s-a anulat.</td></tr>
+</table>
+<p>Tu primești pe email o alertă la fiecare programare nouă, plus un raport seara, cu ședințele de a doua zi.</p>
+
+<!-- 13 -->
+<h2 id="sedinta"><span class="n">13</span>Ziua ședinței și livrarea</h2>
+<h3>Înainte</h3>
+<p>Uită-te în <b>Panou → Azi și mâine</b>: cine vine, la ce oră, ce pachet are și dacă a plătit. Clientul primește singur reamintirile.</p>
+<h3>La studio</h3>
+<ol class="steps">
+	<li>Dacă plătește acum, apasă <span class="ui">Cash</span> sau <span class="ui">Card</span> în Panou sau în calendar.</li>
+	<li>Dacă vrea alt pachet (de exemplu Plus în loc de Foto), schimbă pachetul din fișă și salvează. Prețul se recalculează.</li>
+</ol>
+<h3>După ședință</h3>
+<ol class="steps">
+	<li>În fișă, la <b>Status programare</b>, alege <b>Finalizată</b> și salvează. Dacă clientul n-a venit, alege <b>Neprezentat</b>.</li>
+	<li>În Google Sheet, tab-ul <b>Programari</b>, pe rândul clientului: la <b>Etapa</b> treci <i>Editat</i> când lucrezi la poze, apoi <i>Livrat</i> când le-ai trimis. Completează <b>Nr. bon/factura</b> și <b>Link galerie</b>.</li>
+	<li>Trimite galeria clientului cum o trimiți de obicei.</li>
+</ol>
+
+<!-- 14 -->
+<h2 id="sheet"><span class="n">14</span>Copia din Google Sheet</h2>
+<p>Fișierul „[Stefan Chelmu] Craciun 2026” din Google Drive se completează singur la fiecare programare, plată, mutare sau anulare.</p>
+<table>
+	<tr><th>Tab</th><th>Ce e</th><th>Poți scrie?</th></tr>
+	<tr><td><b>Programari</b></td><td>Lista ta cu toate programările. Are listele derulante Pachet, Status, Plata și Etapa (Programat, Editat, Livrat).</td><td>Da. Coloanele tale sunt <b>Etapa</b>, <b>Nr. bon/factura</b> și <b>Link galerie</b>, pe care site-ul nu le atinge niciodată.</td></tr>
+	<tr><td><b>Noiembrie / Decembrie</b></td><td>Agenda pe zile și ore, ca în anii trecuți. Apar doar programările confirmate.</td><td>Doar în <b>Observații</b>, <b>Nr. bon/factura</b> și <b>Link galerie</b>. Restul e blocat.</td></tr>
+	<tr><td><b>Leads</b></td><td>Tot ce a intrat de pe site, inclusiv anulările.</td><td>Nu (e blocat).</td></tr>
+	<tr><td><b>Anulari</b></td><td>Doar programările anulate.</td><td>Nu (e blocat).</td></tr>
+</table>
+<div class="box stop"><strong>Atenție</strong>Dacă schimbi în Sheet ora, numele sau plata, schimbarea <b>nu</b> ajunge în site și se pierde la următoarea actualizare. Schimbările se fac în site.</div>
+
+<!-- 15 -->
+<h2 id="intrebari"><span class="n">15</span>Situații frecvente</h2>
+<div class="faq">
+	<h3>Clientul sună să mute ședința</h3>
+	<p>Calendar → apeși pe programare → <span class="ui">Mută pe altă zi sau oră</span> → alegi ziua și ora → <span class="ui">Mută</span>. Clientul primește email și SMS.</p>
+
+	<h3>Clientul n-a apucat să plătească online</h3>
+	<p>Dacă mai vrea, apasă <span class="ui">Prelungește termenul cu 24 de ore</span> în fișă și trimite-i linkul (<span class="ui">Copiază</span>, apoi pe WhatsApp). Dacă vrea să plătească la tine: <span class="ui">Trece pe plată la studio</span>.</p>
+
+	<h3>Programarea s-a anulat singură, dar clientul tot vrea ora</h3>
+	<p>Dacă ora e încă liberă, fă-i o programare nouă din <span class="ui">+ Programare</span>, pe aceeași oră, cu „La studio” sau „Online”.</p>
+
+	<h3>Clientul vrea alt pachet</h3>
+	<p>Fișa completă → <b>Pachet</b> → alegi pachetul → <span class="ui">Salvează modificările</span>. Prețul se recalculează.</p>
+
+	<h3>Clientul anulează</h3>
+	<p>Calendar sau fișă → <span class="ui">Anulează programarea</span>. Dacă vrei, lasă bifat „Anunță clientul”. Ora devine imediat liberă pe site.</p>
+
+	<h3>Codul de voucher nu merge</h3>
+	<p>Caută codul în <span class="path">Vouchere cadou</span>. Acolo vezi dacă e valabil, folosit sau anulat și pentru ce pachet e. Voucherul merge doar pentru pachetul cumpărat.</p>
+
+	<h3>Nu vreau să lucrez într-o anumită zi sau oră</h3>
+	<p>Calendar → apeși pe ora liberă → <span class="ui">Blochează ora</span>. Pentru o zi întreagă: <b>⋯</b> lângă zi → <span class="ui">Închide toată ziua</span>.</p>
+
+	<h3>Un client spune că n-a primit SMS-ul</h3>
+	<p>Verifică în fișă că telefonul e scris corect. SMS-urile pleacă doar pe numere mobile din România (07…). Clientul primește oricum și emailul, dacă l-a dat.</p>
+</div>
+
+<footer>
+	Ghid pentru pluginul „SC Programări Crăciun”, sezonul 2026. Capturile sunt făcute pe o copie de test, cu programări demonstrative.
+</footer>
+
+</div>
+</body>
+</html>
