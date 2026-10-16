@@ -92,7 +92,8 @@ add_action(
  * din wp-config.php. Se folosește SCP_GITHUB_TOKEN dacă există, altfel tokenul deja definit pentru
  * pluginul SC Wfolio Gate (SC_WFG_GITHUB_TOKEN), cu condiția să aibă acces și la acest repo.
  */
-if ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+// Pe o copie de lucru clonată cu git (Local) nu se caută update-uri: un update din WordPress ar înlocui folderul și ar șterge .git.
+if ( ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && ! is_dir( SCP_DIR . '.git' ) ) {
 	require_once SCP_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 	if ( class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
 		$scp_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(

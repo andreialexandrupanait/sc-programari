@@ -42,6 +42,10 @@ Plugin WordPress pentru programările la ședințele foto de Crăciun ale studio
 - Fluxul SMS se testează în simulare: înscriere, plată, mutare, anulare, plată cash, recuperare, webhook (403 fără token, 200 cu token), reîncercări, email de backup, raport.
 - `php -l` pe fișierele modificate înainte de commit.
 
+## Lucru pe Local
+
+Repo-ul e clonat direct în `wp-content/plugins/sc-programari` al site-ului din Local (stefanchelmu.local). Pe o copie cu `.git`, Plugin Update Checker nu pornește, ca un update din WordPress să nu înlocuiască folderul. Înainte de lucru: `git pull`. Pe Local nu există cheie SMSO, deci SMS-urile rulează în simulare.
+
 ## Release
 
 Push pe `main` cu versiunea crescută → `.github/workflows/release.yml` face release-ul `vX.Y.Z` cu `sc-programari.zip` → WordPress oferă update-ul în pagina de pluginuri. Fără versiune crescută nu se face release.
