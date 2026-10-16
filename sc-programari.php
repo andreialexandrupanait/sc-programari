@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.3.1
+ * Version:           1.3.2
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -24,7 +24,7 @@ if ( defined( 'SCP_VERSION' ) ) {
 	return;
 }
 
-define( 'SCP_VERSION', '1.3.1' );
+define( 'SCP_VERSION', '1.3.2' );
 define( 'SCP_DB_VERSION', '7' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
@@ -128,7 +128,8 @@ add_action(
  * pluginul SC Wfolio Gate (SC_WFG_GITHUB_TOKEN), cu condiția să aibă acces și la acest repo.
  */
 // Pe o copie de lucru clonată cu git (Local) nu se caută update-uri: un update din WordPress ar înlocui folderul și ar șterge .git.
-if ( ( ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && ! is_dir( SCP_DIR . '.git' ) ) {
+// Și pe admin-ajax: butonul „Actualizează acum” din pagina de module rulează acolo (fără el, WordPress spune „are deja ultima versiune”).
+if ( ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && ! is_dir( SCP_DIR . '.git' ) ) {
 	require_once SCP_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 	if ( class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
 		$scp_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
