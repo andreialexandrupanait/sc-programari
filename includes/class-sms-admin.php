@@ -11,7 +11,7 @@ class SCP_SMS_Admin {
 
 	public static function init(): void {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ), 20 );
-		foreach ( array( 'save', 'test', 'check', 'resend' ) as $a ) {
+		foreach ( array( 'save', 'test', 'check', 'resend', 'samples' ) as $a ) {
 			add_action( 'admin_post_scp_sms_' . $a, array( __CLASS__, 'handle_' . $a ) );
 		}
 	}
@@ -86,6 +86,17 @@ class SCP_SMS_Admin {
 		}
 		$ids = SCP_SMS::send_test( $nums, (string) ( $p['text'] ?? '' ) );
 		self::back( count( $ids ) . ' mesaje de test trimise. Statusul se actualizează când răspunde operatorul (de obicei în câteva secunde, uneori câteva minute).', '#test' );
+	}
+
+	public static function handle_samples(): void {
+		self::guard( 'scp_sms_samples' );
+		$p   = wp_unslash( $_POST ); // phpcs:ignore
+		$num = trim( (string) ( $p['number'] ?? '' ) );
+		if ( '' === $num ) {
+			self::back( 'Completează numărul pe care vrei să primești mesajele.', '#probe' );
+		}
+		$ids = SCP_SMS::send_samples( $num );
+		self::back( $ids ? count( $ids ) . ' mesaje de probă trimise pe ' . $num . '. Le vezi mai jos, în jurnal, ca „Probă: …”.' : 'Numărul nu pare corect.', '#jurnal' );
 	}
 
 	public static function handle_check(): void {
@@ -173,6 +184,17 @@ class SCP_SMS_Admin {
 					</td></tr>
 					<tr><th>Raport zilnic</th><td><?php echo $s['report_enabled'] ? 'la ' . esc_html( $s['report_time'] ) . ( $cron['next_report'] ? ', următorul ' . esc_html( wp_date( 'j M, H:i', (int) $cron['next_report'] ) ) : '' ) : 'oprit'; ?> · către <?php echo esc_html( implode( ', ', SCP_SMS::alert_recipients() ) ?: 'nimeni' ); ?></td></tr>
 				</table>
+			</section>
+
+			<section class="scp-panel" id="probe">
+				<h2>Toate mesajele, acum, pe numărul tău</h2>
+				<p class="description">Trimite imediat câte un exemplu din fiecare mesaj automat (<?php echo esc_html( implode( ', ', SCP_SMS::SAMPLES ) ); ?>), cu textele din setările de mai jos și o programare de exemplu (Alexandra, 25.11, ora 17:00). Nu ține cont de „Trimitere automată”, nu atinge programările și consumă câte un SMS pentru fiecare mesaj (<?php echo (int) count( SCP_SMS::SAMPLES ); ?> în total). Linkul de plată din primul mesaj e de exemplu și nu duce la o programare.</p>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-inline-form" onsubmit="return confirm('Trimit <?php echo (int) count( SCP_SMS::SAMPLES ); ?> SMS-uri de probă pe acest număr?');">
+					<?php wp_nonce_field( 'scp_sms_samples' ); ?><input type="hidden" name="action" value="scp_sms_samples">
+					<?php $first = SCP_SMS::test_numbers()[0] ?? ''; ?>
+					<p><label for="sample-number"><b>Numărul tău</b></label><br><input type="tel" class="regular-text" id="sample-number" name="number" value="<?php echo esc_attr( $first ? SCP_Helpers::normalize_phone( $first ) : '' ); ?>" placeholder="07xx xxx xxx" required>
+					<button class="button button-primary">Trimite toate mesajele</button></p>
+				</form>
 			</section>
 
 			<section class="scp-panel" id="test">

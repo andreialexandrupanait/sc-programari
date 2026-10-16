@@ -805,6 +805,9 @@ class SCP_SMS {
 
 	public static function type_label( string $t ): string {
 		$l = array( 'created' => 'Rezervare', 'paid' => 'Confirmare', 'moved' => 'Mutare', 'remind_day' => 'Cu o zi înainte', 'remind_hour' => 'Cu o oră înainte' );
+		if ( preg_match( '/^proba-\d+-(.+)$/', $t, $m ) ) {
+			return 'Probă: ' . ( self::SAMPLES[ $m[1] ] ?? $m[1] );
+		}
 		return $l[ $t ] ?? ( str_starts_with( $t, 'test-' ) ? 'Test livrare' : $t );
 	}
 
@@ -898,6 +901,48 @@ class SCP_SMS {
 			$out[] = $id;
 		}
 		update_option( 'scp_sms_last_test', $batch, false );
+		return $out;
+	}
+
+	/** Mesajele automate, în ordinea în care le primește un client, cu eticheta lor. */
+	const SAMPLES = array(
+		'created'     => 'Rezervare cu link de plată',
+		'paid'        => 'Plată primită',
+		'voucher'     => 'Rezervare cu voucher',
+		'studio'      => 'Plata la studio',
+		'moved'       => 'Mutare',
+		'remind_day'  => 'Cu o zi înainte',
+		'remind_hour' => 'Cu o oră înainte',
+	);
+
+	/**
+	 * Trimite acum, pe un număr, câte un exemplu din fiecare mesaj automat, cu textele din setări și date de exemplu.
+	 * Nu ține cont de „Trimitere automată” și nu atinge programările; rândurile au booking_id 0 și tipul proba-{lot}-{mesaj}.
+	 */
+	public static function send_samples( string $number ): array {
+		global $wpdb;
+		$to = self::e164( $number );
+		if ( strlen( $to ) < 11 ) {
+			return array();
+		}
+		$batch = gmdate( 'ymdHis' );
+		$tpls  = self::get( 'templates' );
+		$out   = array();
+		foreach ( self::SAMPLES as $key => $label ) {
+			$b    = array_merge( self::sample_booking(), array( 'phone' => $to ), 'voucher' === $key ? array( 'payment_status' => 'voucher' ) : array() );
+			$text = self::render( (string) ( $tpls[ $key ]['body'] ?? '' ), $b );
+			if ( '' === $text ) {
+				continue;
+			}
+			$now = SCP_Helpers::mysql_now();
+			$wpdb->insert( self::table(), array( 'booking_id' => 0, 'type' => 'proba-' . $batch . '-' . $key, 'phone' => $to, 'body' => $text, 'status' => 'queued', 'provider' => self::provider()->id(), 'slot' => $key, 'created_at' => $now, 'updated_at' => $now ) );
+			$id = (int) $wpdb->insert_id;
+			self::deliver( $id, $to, $text, null );
+			if ( ! self::provider()->is_configured() ) {
+				self::job_check( $id );
+			}
+			$out[] = $id;
+		}
 		return $out;
 	}
 
