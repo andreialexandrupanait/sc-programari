@@ -29,6 +29,8 @@ class SCP_SMS {
 	public static function defaults(): array {
 		return array(
 			'enabled'          => 0,
+			'test_mode'        => 0,  // pornit + test_mode = SMS-uri doar către test_numbers
+			'test_numbers'     => '',
 			'sender'           => '',
 			'address'          => 'Str. Macedona 5, Galati',
 			'remind_day_time'  => '18:00',
@@ -62,6 +64,22 @@ class SCP_SMS {
 		$out['templates'] = array_replace_recursive( $def['templates'], (array) ( $saved['templates'] ?? array() ) );
 		self::$settings   = $out;
 		return $out;
+	}
+
+	/** Numerele din lista de test (Programări → SMS), în format E.164. */
+	public static function test_numbers(): array {
+		$out = array();
+		foreach ( preg_split( '/[,;\n]+/', (string) self::get( 'test_numbers' ) ) as $n ) {
+			$e = self::e164( (string) $n );
+			if ( strlen( $e ) >= 11 ) {
+				$out[] = $e;
+			}
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	public static function is_test_number( string $phone ): bool {
+		return in_array( self::e164( $phone ), self::test_numbers(), true );
 	}
 
 	public static function get( string $key ) {
@@ -496,6 +514,8 @@ class SCP_SMS {
 			$skip = 'SMS-urile sunt oprite';
 		} elseif ( 'cancelled' === $b['status'] ) {
 			$skip = 'Programarea e anulată';
+		} elseif ( self::get( 'test_mode' ) && ! self::is_test_number( (string) $b['phone'] ) ) {
+			$skip = 'Mod test: SMS-urile pleacă doar către numerele de test';
 		} elseif ( ! SCP_Helpers::is_ro_mobile( (string) $b['phone'] ) ) {
 			$skip = 'Număr din afara României: SMS-urile automate pleacă doar pe +407…';
 		} elseif ( $slot && $slot !== self::slot_key( $b ) ) {

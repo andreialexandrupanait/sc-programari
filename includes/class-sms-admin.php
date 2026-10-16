@@ -49,7 +49,9 @@ class SCP_SMS_Admin {
 			}
 		}
 		$values = array(
-			'enabled'          => empty( $p['enabled'] ) ? 0 : 1,
+			'enabled'          => in_array( $p['mode'] ?? '', array( 'test', 'on' ), true ) ? 1 : 0,
+			'test_mode'        => 'test' === ( $p['mode'] ?? '' ) ? 1 : 0,
+			'test_numbers'     => implode( ', ', array_filter( array_map( static fn( $n ) => SCP_Helpers::normalize_phone( trim( $n ) ), preg_split( '/[,;\n]+/', (string) ( $p['test_numbers'] ?? '' ) ) ) ) ),
 			'sender'           => sanitize_text_field( $p['sender'] ?? '' ),
 			'address'          => SCP_SMS::gsm( sanitize_text_field( $p['address'] ?? '' ) ),
 			'remind_day_time'  => $time( $p['remind_day_time'] ?? '', '18:00' ),
@@ -162,7 +164,7 @@ class SCP_SMS_Admin {
 						<tr><th>Credit</th><td><?php echo ! empty( $credit['ok'] ) ? esc_html( number_format_i18n( (float) $credit['value'], 2 ) ) : $pill( (string) ( $credit['error'] ?? 'Nu s-a putut citi' ), 'bad' ); // phpcs:ignore ?></td></tr>
 					<?php endif; ?>
 					<tr><th>Expeditor</th><td><?php echo defined( 'SCP_SMSO_SENDER' ) ? esc_html( SCP_SMSO_SENDER ) . ' (din wp-config.php)' : ( SCP_SMS::sender() ? esc_html( SCP_SMS::sender() ) : $pill( 'neales', 'warn' ) ); // phpcs:ignore ?></td></tr>
-					<tr><th>Trimitere automată</th><td><?php echo $s['enabled'] ? $pill( 'Pornită', 'ok' ) : $pill( 'Oprită', 'warn' ); // phpcs:ignore ?></td></tr>
+					<tr><th>Trimitere automată</th><td><?php echo ! $s['enabled'] ? $pill( 'Oprită', 'warn' ) : ( $s['test_mode'] ? $pill( 'Mod test: doar către ' . count( SCP_SMS::test_numbers() ) . ' numere de test', 'warn' ) : $pill( 'Pornită pentru toți clienții', 'ok' ) ); // phpcs:ignore ?></td></tr>
 					<tr><th>Action Scheduler</th><td><?php echo SCP_SMS::has_scheduler() ? $pill( 'Disponibil', 'ok' ) . ' · ' . (int) $cron['pending'] . ' joburi SMS în așteptare' : $pill( 'Lipsește (vine cu WooCommerce)', 'bad' ); // phpcs:ignore ?></td></tr>
 					<tr><th>Cron</th><td>
 						<?php echo $wp_cron_off ? $pill( 'DISABLE_WP_CRON activ, cron real pe server', 'ok' ) : $pill( 'WP-Cron pornit de vizite (de mutat pe cron real)', 'warn' ); // phpcs:ignore ?>
@@ -211,7 +213,14 @@ class SCP_SMS_Admin {
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'scp_sms_save' ); ?><input type="hidden" name="action" value="scp_sms_save">
 					<table class="form-table" role="presentation">
-						<tr><th>Trimitere automată</th><td><label><input type="checkbox" name="enabled" value="1" <?php checked( $s['enabled'] ); ?>> Trimite SMS-urile către clienți</label><p class="description">Pornește-o după ce testul de livrare a trecut pe toate rețelele.</p></td></tr>
+						<?php $mode = ! $s['enabled'] ? 'off' : ( $s['test_mode'] ? 'test' : 'on' ); ?>
+						<tr><th>Trimitere automată</th><td>
+							<label><input type="radio" name="mode" value="off" <?php checked( $mode, 'off' ); ?>> Oprită</label><br>
+							<label><input type="radio" name="mode" value="test" <?php checked( $mode, 'test' ); ?>> <strong>Mod test:</strong> doar către numerele de mai jos (clienții nu primesc nimic)</label><br>
+							<label><input type="radio" name="mode" value="on" <?php checked( $mode, 'on' ); ?>> Către toți clienții</label>
+							<p class="description">Pași: întâi testul de livrare pe rețele (mai sus), apoi „Mod test” și o programare de probă pe numărul tău (rezervare, plată, mutare, reamintiri), apoi „Către toți clienții”.</p>
+						</td></tr>
+						<tr><th><label for="test_numbers">Numere de test</label></th><td><input type="text" class="large-text" name="test_numbers" id="test_numbers" value="<?php echo esc_attr( (string) $s['test_numbers'] ); ?>" placeholder="ex. 0755 215 135, 0749 270 232"><p class="description">Separate prin virgulă. În „Mod test”, doar programările cu aceste numere primesc SMS; restul apar în jurnal ca „Nu a mai fost nevoie: mod test”.</p></td></tr>
 						<?php if ( ! defined( 'SCP_SMSO_SENDER' ) ) : ?>
 						<tr><th><label for="sender">Expeditor</label></th><td>
 							<?php if ( $senders ) : ?>
