@@ -47,11 +47,13 @@ class SCP_SMS_Provider_SMSO implements SCP_SMS_Provider {
 			return array( 'code' => 0, 'json' => null, 'error' => $res->get_error_message() );
 		}
 		$code = (int) wp_remote_retrieve_response_code( $res );
-		$json = json_decode( (string) wp_remote_retrieve_body( $res ), true );
-		return array( 'code' => $code, 'json' => is_array( $json ) ? $json : null, 'error' => '' );
+		$raw  = (string) wp_remote_retrieve_body( $res );
+		$json = json_decode( $raw, true );
+		// Fără răspunsul exact, un „400” nu spune ce parametru nu i-a plăcut SMSO; îl păstrăm în jurnal.
+		return array( 'code' => $code, 'json' => is_array( $json ) ? $json : null, 'error' => '', 'raw' => mb_substr( wp_strip_all_tags( $raw ), 0, 300 ) );
 	}
 
-	private static function error_text( int $code, ?array $json, string $fallback = '' ): string {
+	private static function error_text( int $code, ?array $json, string $fallback = '', string $raw = '' ): string {
 		$known = array(
 			400 => 'Cerere invalidă',
 			401 => 'Cheia API SMSO nu e validă',
@@ -69,6 +71,13 @@ class SCP_SMS_Provider_SMSO implements SCP_SMS_Provider {
 					break;
 				}
 			}
+		}
+		if ( '' === $detail && $json ) {
+			$rest   = array_diff_key( $json, array( 'status' => 1 ) );
+			$detail = $rest ? (string) wp_json_encode( $rest, JSON_UNESCAPED_UNICODE ) : '';
+		}
+		if ( '' === $detail && '' !== $raw ) {
+			$detail = $raw;
 		}
 		$text = $known[ $code ] ?? ( $code ? 'Eroare SMSO ' . $code : ( $fallback ?: 'Fără răspuns de la SMSO' ) );
 		return mb_substr( $text . ( $detail ? ': ' . $detail : '' ), 0, 250 );
@@ -104,7 +113,7 @@ class SCP_SMS_Provider_SMSO implements SCP_SMS_Provider {
 			'id'    => '',
 			'cost'  => null,
 			'code'  => $code,
-			'error' => self::error_text( $code, $json, $r['error'] ),
+			'error' => self::error_text( $code, $json, $r['error'], (string) ( $r['raw'] ?? '' ) ),
 			// rețea, 409 (limită pe minut), 5xx și 402 (creditul se poate reîncărca) merită reîncercate
 			'retry' => 0 === $code || 409 === $code || 429 === $code || $code >= 500 || 402 === $code,
 			'alert' => 401 === $code ? 'auth' : ( 402 === $code ? 'credit' : '' ),
