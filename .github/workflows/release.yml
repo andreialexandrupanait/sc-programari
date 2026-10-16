@@ -1,0 +1,79 @@
+name: Release plugin
+
+# Creeaza automat un GitHub Release + ZIP curat cand versiunea din header-ul
+# pluginului creste. Site-ul (prin Plugin Update Checker) vede release-ul si
+# ofera update in WordPress.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sc-programari.php'
+      - 'includes/**'
+      - 'assets/**'
+      - 'templates/**'
+      - 'lib/**'
+      - 'uninstall.php'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Citeste versiunea din header
+        id: version
+        run: |
+          VERSION=$(grep -iE '^\s*\*\s*Version:' sc-programari.php | head -1 | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "Nu am gasit versiunea in header." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Versiune detectata: $VERSION"
+
+      - name: Verifica daca release-ul exista deja
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.version.outputs.version }} exista deja, se sare peste."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Construieste ZIP-ul pluginului
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          mkdir -p build/sc-programari
+          rsync -a ./ build/sc-programari/ \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'dev' \
+            --exclude 'tools' \
+            --exclude 'CLAUDE.md' \
+            --exclude '.gitignore' \
+            --exclude 'build' \
+            --exclude '*.zip'
+          cd build
+          zip -rq sc-programari.zip sc-programari
+          ls -la
+
+      - name: Creeaza release-ul cu asset
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            build/sc-programari.zip \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes "Versiune ${{ steps.version.outputs.version }} a pluginului SC Programări Crăciun." \
+            --target "${{ github.sha }}"

@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.2.1
+ * Version:           1.2.2
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SCP_VERSION', '1.2.1' );
+define( 'SCP_VERSION', '1.2.2' );
 define( 'SCP_DB_VERSION', '5' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
@@ -73,3 +73,30 @@ add_action(
 		}
 	}
 );
+
+/*
+ * Update din GitHub (Plugin Update Checker). La fiecare versiune nouă din header, GitHub Action-ul
+ * din .github/workflows/release.yml face un release cu sc-programari.zip, iar WordPress îl oferă
+ * ca update în pagina de pluginuri. Repo-ul e privat, deci descărcarea are nevoie de un token GitHub
+ * din wp-config.php. Se folosește SCP_GITHUB_TOKEN dacă există, altfel tokenul deja definit pentru
+ * pluginul SC Wfolio Gate (SC_WFG_GITHUB_TOKEN), cu condiția să aibă acces și la acest repo.
+ */
+if ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+	require_once SCP_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
+	if ( class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
+		$scp_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+			'https://github.com/andreialexandrupanait/sc-programari/',
+			SCP_FILE,
+			'sc-programari'
+		);
+		$scp_github_token = defined( 'SCP_GITHUB_TOKEN' ) ? SCP_GITHUB_TOKEN : ( defined( 'SC_WFG_GITHUB_TOKEN' ) ? SC_WFG_GITHUB_TOKEN : '' );
+		if ( $scp_github_token ) {
+			$scp_update_checker->setAuthentication( $scp_github_token );
+		}
+		$scp_vcs_api = $scp_update_checker->getVcsApi();
+		if ( method_exists( $scp_vcs_api, 'enableReleaseAssets' ) ) {
+			$scp_vcs_api->enableReleaseAssets( '/sc-programari\.zip$/i' );
+		}
+		unset( $scp_github_token, $scp_vcs_api );
+	}
+}
