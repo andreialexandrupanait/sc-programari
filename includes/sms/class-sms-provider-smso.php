@@ -29,8 +29,8 @@ class SCP_SMS_Provider_SMSO implements SCP_SMS_Provider {
 			'method'  => $method,
 			'timeout' => 15,
 			'headers' => array(
-				'Accept'       => 'application/json',
-				'X-Source-App' => 'SC-Programari/' . ( defined( 'SCP_VERSION' ) ? SCP_VERSION : '1' ),
+				'Accept' => 'application/json',
+				// Fără X-Source-App: e opțional, iar SMSO respinge cu 400 orice valoare care nu e exact „Nume/Versiune”.
 			),
 		);
 		if ( $auth ) {
