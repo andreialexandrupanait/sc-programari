@@ -1,0 +1,7 @@
+# Artefacte de build (ZIP-ul îl face GitHub Action, nu îl versionăm)
+build/
+*.zip
+
+# Fișiere de sistem
+.DS_Store
+Thumbs.db

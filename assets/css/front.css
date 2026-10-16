@@ -1,0 +1,334 @@
+/* Fonturi găzduite local: titlurile în fontul din 2025 (Fredoka One), completat cu ă, ș, ț. */
+@font-face{font-family:"Chelmu Rounded";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/chelmu-rounded.woff2) format("woff2")}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/source-sans-pro-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/source-sans-pro-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:600;font-display:swap;src:url(../fonts/source-sans-pro-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:600;font-display:swap;src:url(../fonts/source-sans-pro-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:700;font-display:swap;src:url(../fonts/source-sans-pro-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:700;font-display:swap;src:url(../fonts/source-sans-pro-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+/* SC Programări – formular public. Culorile și fonturile vin din kitul Elementor al site-ului. */
+.scp {
+	--scp-green: #2d661b;
+	--scp-green-deep: #1f3a17;
+	--scp-green-soft: #e7eee3;
+	--scp-gold: #cfab62;
+	--scp-gold-soft: #f6eedc;
+	--scp-sage: #819170;
+	--scp-sand: #ece9e2;
+	--scp-line: #d9d4ca;
+	--scp-ink: #2b2925;
+	--scp-text: #5e5a52;
+	--scp-muted: #8f887b;
+	--scp-error: #a8321e;
+	--scp-display: "Chelmu Rounded", "Fredoka One", "Trebuchet MS", sans-serif;
+	--scp-body: "Source Sans Pro", "Source Sans 3", "Segoe UI", Arial, sans-serif;
+	font-family: var(--scp-body);
+	color: var(--scp-text);
+	max-width: 980px;
+	margin: 0 auto;
+	text-align: left;
+	-webkit-font-smoothing: antialiased;
+	container-type: inline-size;
+}
+.scp *, .scp *::before, .scp *::after { box-sizing: border-box; }
+.scp-title { font-family: var(--scp-display); color: #fff; text-align: center; margin: 0 0 20px; }
+
+.scp-card {
+	background: #fff;
+	border-radius: 14px;
+	padding: 8px 36px 32px;
+	box-shadow: 0 24px 60px -24px rgba(20, 30, 15, .55);
+	min-height: 220px;
+}
+.scp .scp-sr { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.scp-muted { color: var(--scp-muted); }
+.scp-note { margin: 24px 0; font-size: 17px; }
+.scp-note--error { color: var(--scp-error); }
+
+.scp-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 200px; color: var(--scp-muted); }
+.scp-spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--scp-sand); border-top-color: var(--scp-green); animation: scp-spin .8s linear infinite; display: inline-block; }
+@keyframes scp-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Pași ---------- */
+.scp-step { padding: 28px 0 30px; border-bottom: 1px solid var(--scp-sand); scroll-margin-top: 110px; }
+.scp { scroll-margin-top: 110px; }
+.scp-step-h { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.scp-step-h h3 {
+	margin: 0;
+	font-family: var(--scp-display);
+	font-weight: 400;
+	font-size: 23px;
+	line-height: 1.2;
+	color: var(--scp-ink);
+	text-transform: none;
+	letter-spacing: 0;
+}
+.scp-num {
+	flex: 0 0 auto;
+	width: 30px; height: 30px;
+	border-radius: 50%;
+	display: inline-flex; align-items: center; justify-content: center;
+	background: var(--scp-green-deep);
+	color: var(--scp-gold);
+	font-family: var(--scp-display);
+	font-size: 15px;
+}
+
+/* ---------- Pachete ---------- */
+.scp-packages { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.scp-pkg { position: relative; display: block; cursor: pointer; margin: 0; }
+.scp-pkg-body {
+	display: block;
+	height: 100%;
+	padding: 18px 20px 16px;
+	border: 2px solid var(--scp-line);
+	border-radius: 10px;
+	background: #fff;
+	transition: border-color .15s, background-color .15s;
+}
+.scp-pkg:hover .scp-pkg-body { border-color: var(--scp-sage); }
+.scp-pkg input:checked + .scp-pkg-body { border-color: var(--scp-green); background: var(--scp-green-soft); }
+.scp-pkg input:focus-visible + .scp-pkg-body { outline: 3px solid var(--scp-gold); outline-offset: 2px; }
+.scp-pkg-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-right: 30px; }
+.scp-pkg-name { font-weight: 700; font-size: 18px; color: var(--scp-ink); }
+.scp-pkg-price { font-family: var(--scp-display); font-size: 28px; line-height: 1; color: var(--scp-green); white-space: nowrap; }
+.scp-pkg-price small { font-family: var(--scp-body); font-size: 15px; font-weight: 600; color: var(--scp-text); }
+.scp-pkg-list { list-style: none; margin: 12px 0 0; padding: 0; font-size: 16px; line-height: 1.5; }
+.scp-pkg-list li { position: relative; padding-left: 18px; }
+.scp-pkg-list li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 2px; background: var(--scp-gold); transform: rotate(45deg); }
+.scp-pkg-check {
+	position: absolute; top: 16px; right: 16px;
+	width: 22px; height: 22px; border-radius: 50%;
+	border: 2px solid var(--scp-line); background: #fff;
+}
+.scp-pkg input:checked + .scp-pkg-body .scp-pkg-check { border-color: var(--scp-green); background: var(--scp-green); box-shadow: inset 0 0 0 4px #fff; }
+
+/* Reducere și voucher */
+.scp-pkg-old { font-family: var(--scp-body); font-size: 17px; font-weight: 600; color: var(--scp-muted); text-decoration-thickness: 1.5px; margin-right: 2px; }
+.scp-pkg-deal { display: inline-block; margin-top: 10px; padding: 3px 9px; border-radius: 4px; background: var(--scp-gold-soft); color: #7a5a17; font-size: 14px; font-weight: 600; line-height: 1.35; }
+.scp-pkg-deal[hidden] { display: none; }
+.scp .scp-link { padding: 0; border: 0; background: none; color: var(--scp-green); font: inherit; font-size: 16px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: flex-start; }
+.scp .scp-link:hover { color: var(--scp-green-deep); background: none; }
+.scp-voucher-row { display: flex; gap: 8px; margin-top: 8px; max-width: 420px; }
+.scp-voucher-row[hidden] { display: none; }
+.scp .scp-voucher-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .06em; }
+.scp .scp-btn--small { padding: 10px 18px; }
+.scp-voucher-msg { margin: 6px 0 0; font-size: 15px; color: var(--scp-text); }
+.scp-voucher-msg:empty { display: none; }
+.scp-voucher-msg.is-ok { color: var(--scp-green); font-weight: 600; }
+.scp-voucher-msg.is-bad { color: var(--scp-error); }
+
+/* ---------- Calendar ---------- */
+.scp-when { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.scp-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.scp-month { font-family: var(--scp-display); font-size: 20px; color: var(--scp-ink); text-transform: capitalize; }
+.scp .scp-nav {
+	width: 38px; height: 38px; padding: 0;
+	border: 1px solid var(--scp-line); border-radius: 50%;
+	background: #fff; color: var(--scp-ink);
+	font-size: 22px; line-height: 1; cursor: pointer;
+	display: inline-flex; align-items: center; justify-content: center;
+}
+.scp .scp-nav:hover:not(:disabled) { border-color: var(--scp-green); color: var(--scp-green); background: #fff; }
+.scp .scp-nav:disabled { opacity: .35; cursor: default; }
+.scp-cal-dow, .scp-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.scp-cal-dow span { text-align: center; font-size: 13px; font-weight: 600; color: var(--scp-muted); padding: 4px 0; }
+.scp-cal-grid.is-loading { opacity: .45; pointer-events: none; }
+
+.scp .scp-day {
+	position: relative;
+	aspect-ratio: 1 / 1.02;
+	min-height: 44px;
+	padding: 6px 0 0;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: #c3bdb1;
+	font: inherit;
+	display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px;
+	cursor: default;
+	transition: background-color .12s, border-color .12s, color .12s;
+}
+.scp-day-n { font-size: 17px; font-weight: 600; line-height: 1.2; }
+.scp .scp-day--blank { visibility: hidden; }
+.scp .scp-day--available {
+	background: #fff;
+	border-color: var(--scp-line);
+	color: var(--scp-ink);
+	cursor: pointer;
+}
+.scp .scp-day--available:not(.is-selected):hover { border-color: var(--scp-green); background: var(--scp-green-soft); color: var(--scp-ink); }
+.scp .scp-day--full { background: var(--scp-sand); color: var(--scp-muted); }
+.scp .scp-day--full .scp-day-n { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, .25); }
+.scp-day-full { font-size: 11px; letter-spacing: .02em; }
+.scp .scp-day.is-today .scp-day-n { text-decoration: underline; text-decoration-color: var(--scp-gold); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.scp .scp-day.is-selected,
+.scp .scp-day.is-selected:hover { background: var(--scp-green); border-color: var(--scp-green); color: #fff; }
+.scp .scp-day:focus-visible { outline: 3px solid var(--scp-gold); outline-offset: 1px; }
+
+/* Punctele arată câte ore libere mai sunt în ziua respectivă. */
+.scp-dots { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; max-width: 34px; }
+.scp-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--scp-gold); }
+.scp-day.is-selected .scp-dots i { background: #f3dfa9; }
+.scp-legend { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 14px; color: var(--scp-muted); }
+.scp-dots--legend { max-width: none; }
+
+/* ---------- Ore ---------- */
+.scp-slots { background: var(--scp-sand); border-radius: 10px; padding: 20px; min-height: 100%; }
+.scp-slots-empty p { margin: 0 0 6px; }
+.scp-slots-empty p:first-child { color: var(--scp-ink); font-size: 17px; }
+.scp-slots-title { margin: 0 0 14px; font-family: var(--scp-display); font-size: 18px; color: var(--scp-ink); }
+.scp-slots-title::first-letter { text-transform: uppercase; }
+.scp-slot-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.scp-slot-list.is-loading { display: flex; justify-content: center; padding: 20px 0; }
+.scp .scp-slot {
+	display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+	padding: 10px 14px;
+	border: 2px solid transparent; border-radius: 8px;
+	background: #fff; color: var(--scp-ink);
+	font: inherit; text-align: left; cursor: pointer;
+	transition: border-color .12s, background-color .12s;
+}
+.scp .scp-slot:hover:not(:disabled):not(.is-selected) { border-color: var(--scp-green); background: #fff; color: var(--scp-ink); }
+.scp-slot-t { font-size: 19px; font-weight: 700; line-height: 1.2; }
+.scp-slot-s { font-size: 13px; color: var(--scp-muted); }
+.scp .scp-slot.is-taken { background: transparent; border-color: rgba(0, 0, 0, .06); color: var(--scp-muted); cursor: default; }
+.scp .scp-slot.is-taken .scp-slot-t { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, .25); font-weight: 600; }
+.scp .scp-slot.is-selected { background: var(--scp-green); border-color: var(--scp-green); color: #fff; }
+.scp .scp-slot.is-selected .scp-slot-s { color: rgba(255, 255, 255, .8); }
+.scp .scp-slot:focus-visible { outline: 3px solid var(--scp-gold); outline-offset: 1px; }
+
+/* ---------- Câmpuri ---------- */
+.scp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; }
+.scp-field { display: flex; flex-direction: column; gap: 6px; }
+.scp-field--wide { grid-column: 1 / -1; }
+.scp-field > label { font-size: 15px; font-weight: 600; color: var(--scp-ink); }
+.scp-opt { font-weight: 400; color: var(--scp-muted); }
+.scp .scp-field input[type="text"],
+.scp .scp-field input[type="tel"],
+.scp .scp-field input[type="email"],
+.scp .scp-field textarea {
+	width: 100%;
+	padding: 12px 14px;
+	border: 1px solid var(--scp-line);
+	border-radius: 6px;
+	background: #fff;
+	color: var(--scp-ink);
+	font: inherit;
+	font-size: 17px;
+	line-height: 1.4;
+	box-shadow: none;
+	transition: border-color .12s, box-shadow .12s;
+}
+.scp .scp-field textarea { resize: vertical; min-height: 84px; }
+.scp .scp-field input::placeholder, .scp .scp-field textarea::placeholder { color: #b5ae9f; }
+.scp .scp-field input:focus, .scp .scp-field textarea:focus { outline: none; border-color: var(--scp-green); box-shadow: 0 0 0 3px rgba(45, 102, 27, .15); }
+.scp .scp-field [aria-invalid="true"] { border-color: var(--scp-error); }
+.scp-field-error { margin: 0; min-height: 0; font-size: 14px; color: var(--scp-error); }
+.scp-field-error:empty { display: none; }
+.scp-packages > .scp-field-error, .scp-step > div > .scp-field-error { grid-column: 1 / -1; margin-top: 4px; }
+.scp-check label { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; font-size: 16px; color: var(--scp-text); cursor: pointer; }
+.scp-check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--scp-green); flex: 0 0 auto; }
+.scp-check a { color: var(--scp-green); text-decoration: underline; }
+.scp-hp { position: absolute !important; left: -9999px !important; width: 1px; height: 1px; overflow: hidden; }
+
+/* ---------- Bara de trimitere ---------- */
+.scp-bar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; }
+.scp-summary { margin: 0; display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; font-size: 16px; line-height: 1.4; }
+.scp-summary strong { color: var(--scp-ink); }
+.scp .scp-btn {
+	display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+	padding: 17px 34px;
+	border: 0; border-radius: 6px;
+	background: var(--scp-green); color: #fff;
+	font-family: var(--scp-display); font-size: 17px; letter-spacing: .03em; font-weight: 400;
+	text-transform: uppercase; text-decoration: none;
+	cursor: pointer; white-space: nowrap;
+	transition: background-color .15s;
+}
+.scp .scp-btn:hover { background: var(--scp-green-deep); color: #fff; }
+.scp .scp-btn:focus-visible { outline: 3px solid var(--scp-gold); outline-offset: 2px; }
+.scp .scp-btn:disabled { opacity: .7; cursor: progress; }
+.scp .scp-btn.is-busy::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff; animation: scp-spin .8s linear infinite; }
+.scp .scp-btn--ghost {
+	background: #fff; color: var(--scp-green);
+	border: 2px solid var(--scp-green);
+	padding: 12px 20px; font-family: var(--scp-body); font-weight: 700; font-size: 15px; text-transform: none; letter-spacing: 0;
+}
+.scp .scp-btn--ghost:hover { background: var(--scp-green-soft); color: var(--scp-green-deep); }
+.scp-form-error { margin: 14px 0 0; color: var(--scp-error); font-weight: 600; }
+.scp-form-error:empty { display: none; }
+
+/* ---------- Confirmare ---------- */
+.scp-done { padding: 40px 8px 12px; text-align: center; outline: none; }
+.scp-done-mark {
+	width: 64px; height: 64px; margin: 0 auto 16px;
+	border-radius: 50%; background: var(--scp-green);
+	position: relative;
+	animation: scp-pop .45s cubic-bezier(.2, .9, .3, 1.3) both;
+}
+.scp-done-mark::after {
+	content: ""; position: absolute; left: 23px; top: 15px;
+	width: 14px; height: 26px;
+	border: solid #fff; border-width: 0 4px 4px 0;
+	transform: rotate(45deg);
+}
+@keyframes scp-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.scp-done-title { margin: 0 0 8px; font-family: var(--scp-display); font-weight: 400; font-size: 34px; color: var(--scp-ink); text-transform: none; }
+.scp-done-when { margin: 0 0 24px; font-size: 20px; line-height: 1.45; color: var(--scp-ink); }
+.scp-done-list { display: inline-grid; gap: 0; margin: 0 auto 22px; padding: 6px 22px; background: var(--scp-sand); border-radius: 10px; text-align: left; min-width: min(420px, 100%); }
+.scp-done-list > div { display: flex; justify-content: space-between; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--scp-line); }
+.scp-done-list > div:last-child { border-bottom: 0; }
+.scp-done-list dt { color: var(--scp-muted); font-size: 15px; }
+.scp-done-list dd { margin: 0; color: var(--scp-ink); font-weight: 600; text-align: right; }
+.scp-code { font-family: var(--scp-display); font-weight: 400 !important; letter-spacing: .12em; color: var(--scp-green) !important; }
+.scp-done-note { max-width: 520px; margin: 0 auto 20px; }
+.scp-done-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 18px; }
+
+.scp-done--pending .scp-done-title { margin-top: 8px; }
+.scp-done-step { max-width: 520px; margin: 0 auto 20px; font-size: 17px; line-height: 1.55; color: var(--scp-ink); }
+.scp .scp-btn--pay { margin: 0 auto 26px; padding: 18px 40px; font-size: 18px; }
+.scp-closed { padding: 48px 12px; text-align: center; }
+.scp-closed-text { margin: 0; font-size: 19px; color: var(--scp-ink); }
+
+/* ---------- Mobil ---------- */
+@media (max-width: 760px) {
+	.scp-card { padding: 4px 18px 22px; border-radius: 12px; }
+	.scp-step { padding: 22px 0 24px; }
+	.scp-step-h h3 { font-size: 20px; }
+	.scp-when { grid-template-columns: 1fr; gap: 18px; }
+	.scp-cal-dow, .scp-cal-grid { gap: 4px; }
+	.scp .scp-day { min-height: 40px; border-radius: 7px; padding-top: 4px; }
+	.scp-day-n { font-size: 16px; }
+	.scp-dots i { width: 4px; height: 4px; }
+	.scp-day-full { display: none; }
+	.scp-slots { padding: 16px; }
+	.scp-slot-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.scp-fields { grid-template-columns: 1fr; }
+	.scp-bar { flex-direction: column; align-items: stretch; gap: 14px; padding-top: 20px; }
+	.scp .scp-bar .scp-btn { width: 100%; }
+	.scp-done-title { font-size: 28px; }
+	.scp-done-list > div { flex-direction: column; gap: 2px; }
+	.scp-done-list dd { text-align: left; }
+}
+/* Când widget-ul stă într-o coloană îngustă din Elementor, calendarul și orele se așază una sub alta. */
+@container (max-width: 680px) {
+	.scp-card { padding: 4px 20px 22px; }
+	.scp-when { grid-template-columns: 1fr; gap: 18px; }
+	.scp-fields { grid-template-columns: 1fr; }
+	.scp-bar { flex-direction: column; align-items: stretch; gap: 14px; }
+	.scp .scp-bar .scp-btn { width: 100%; }
+	.scp-slot-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container (max-width: 420px) {
+	.scp-slot-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.scp-day-full { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.scp *, .scp *::before, .scp *::after { animation: none !important; transition: none !important; }
+}
+
+/* Pachet indisponibil când e folosit un voucher pentru celălalt pachet */
+.scp-pkg.is-locked { opacity: .45; cursor: not-allowed; }
+.scp-pkg.is-locked .scp-pkg-body { border-style: dashed; }
+.scp [hidden] { display: none !important; }

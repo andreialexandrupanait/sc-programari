@@ -1,0 +1,234 @@
+<style>
+/* programarea: titlul și formularul stau pe aceeași poză, sub un strat verde opac (ca în 2025) */
+.sc6-bookwrap{position:relative;background:#12210C url(/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-fundal-formular-1600.webp) center/cover no-repeat!important;padding:0!important}
+.sc6-bookwrap::before{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27180%27%20height%3D%27180%27%20viewBox%3D%270%200%20180%20180%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20opacity%3D%270.1%27%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%280%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%2860%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%28120%2030%2034%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%280%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%2860%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%28120%20128%20112%29%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.1%27%3E%3Cpath%20d%3D%27M104%2025L105.4%2028.6L109%2030L105.4%2031.4L104%2035L102.6%2031.4L99%2030L102.6%2028.6Z%27%2F%3E%3Cpath%20d%3D%27M46%20134L47.12%20136.88L50%20138L47.12%20139.12L46%20142L44.88%20139.12L42%20138L44.88%20136.88Z%27%2F%3E%3Ccircle%20cx%3D%27160%27%20cy%3D%2762%27%20r%3D%271.8%27%2F%3E%3Ccircle%20cx%3D%2782%27%20cy%3D%2784%27%20r%3D%271.4%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") 0 0/180px 180px repeat,linear-gradient(180deg,rgba(18,33,12,.9) 0%,rgba(18,33,12,.94) 45%,rgba(18,33,12,.97) 100%);pointer-events:none}
+.sc6-bookwrap{flex-wrap:nowrap!important}
+.sc6-bookwrap>.e-con-inner,.sc6-bookwrap>.elementor-element{position:relative}
+.sc6-bookwrap .sc6,.sc6-bookwrap .sc6-book{background:transparent}
+@media (max-width:760px){.sc6-bookwrap{background-image:url(/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-fundal-formular-m-800.webp)!important}}
+/* widgeturile Elementor dintre părțile HTML: formularul și recenziile */
+.elementor-element-sc6form{background:transparent;padding:0 20px clamp(64px,8vw,104px)!important}
+.elementor-element-sc6form .scp{max-width:1000px}
+.elementor-element-sc6form .scp-cal-dow{gap:10px!important}
+.elementor-element-sc6form .scp-cal-grid{gap:10px!important;margin-top:4px}
+@media (max-width:760px){.elementor-element-sc6form .scp-cal-dow{gap:6px!important}.elementor-element-sc6form .scp-cal-grid{column-gap:6px!important;row-gap:8px!important}.elementor-element-sc6form .scp .scp-day{aspect-ratio:auto;min-height:52px;padding:7px 0 8px;gap:5px}.elementor-element-sc6form .scp-day .scp-dots{max-width:26px;gap:2px 3px}}
+.elementor-element-sc6form .scp-card{padding:8px clamp(18px,4vw,44px) 32px}
+.elementor-element-sc6rev{padding:0 20px clamp(64px,8vw,104px)!important}
+.elementor-element-sc6rev>.elementor-widget-container,.sc6-revwrap>*{max-width:1120px;margin-left:auto!important;margin-right:auto!important}
+.sc6-rev-empty{max-width:1120px;margin:0 auto;padding:40px;border:2px dashed #E4DED2;border-radius:12px;text-align:center;color:#8F887B;font-family:"Source Sans Pro",Arial,sans-serif}
+
+/* contact și hartă */
+.sc6-contact-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(24px,4vw,48px);align-items:stretch}
+.sc6-contact-card{padding:clamp(28px,4vw,44px);border-radius:14px;background:#fff;border:1px solid var(--line)}
+.sc6-contact-card .sc6-eyebrow{color:#9A7A33}
+.sc6-contact-card h2{margin-top:12px;font-size:clamp(30px,3.6vw,40px);line-height:1.15}
+.sc6-clist{display:grid;gap:18px;margin-top:26px!important}
+.sc6-clist li{display:flex;gap:14px;align-items:flex-start}
+.sc6-clist svg{flex:none;width:22px;height:22px;margin-top:3px;fill:none;stroke:var(--green);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sc6-clist b{display:block;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sc6-clist span,.sc6-clist a{font-size:18px;color:var(--ink);font-weight:600}
+.sc6-clist a:hover{color:var(--green)}
+.sc6-contact-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.sc6-map{position:relative;min-height:380px;border-radius:14px;overflow:hidden;background:var(--line);border:1px solid var(--line)}
+.sc6-map>iframe,.sc6-map>div,.sc6-map>.cmplz-placeholder-element{position:absolute!important;inset:0;display:block;width:100%!important;height:100%!important;min-height:0!important;border:0}
+.sc6-map iframe{display:block;width:100%!important;height:100%!important;min-height:0!important;border:0}
+@media (max-width:760px){.sc6-contact-grid{grid-template-columns:1fr}.sc6-contact-cta .sc6-btn{flex:1 1 100%}.sc6-map{min-height:320px}}
+
+.sc6-foot{background:#17290F;color:rgba(255,255,255,.7);padding:28px 0;font-size:15px}
+.sc6-foot .sc6-wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.sc6-foot img{height:30px;width:auto}
+.sc6-foot a{color:#fff}
+
+/* bara de programare: mereu la îndemână, ascunsă cât timp formularul e pe ecran */
+.sc6-bar{position:fixed;left:50%;bottom:16px;z-index:70;display:flex;gap:8px;align-items:center;padding:8px;border-radius:999px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.22);transform:translate(-50%,150%);transition:transform .35s}
+.sc6-bar.is-on{transform:translate(-50%,0)}
+.sc6-bar .sc6-btn{min-height:48px;border-radius:999px;padding:12px 26px;white-space:nowrap}
+.sc6-bar .sc6-call{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;border:1px solid #E4DED2;color:#2D661B}
+.sc6-bar .sc6-call svg{width:20px;height:20px}
+.sc6-bar-price{padding:0 6px 0 14px;font-size:15px;color:#5E5A52;white-space:nowrap}
+.sc6-bar-price b{color:#2B2925}
+@media (max-width:760px){
+  .sc6-bar{left:12px;right:12px;bottom:12px;transform:translateY(150%)}
+  .sc6-bar.is-on{transform:none}
+  .sc6-bar .sc6-btn{flex:1}
+  .sc6-bar-price{display:none}
+}
+
+.sc6-lb{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;padding:60px 70px;background:rgba(23,41,15,.94)}
+.sc6-lb.is-open{display:flex}
+.sc6-lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+.sc6-lb button{position:absolute;width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font-size:26px;line-height:1;cursor:pointer}
+.sc6-lb .x{top:14px;right:14px}.sc6-lb .p{left:14px;top:50%;margin-top:-24px}.sc6-lb .n{right:14px;top:50%;margin-top:-24px}
+@media (max-width:760px){.sc6-lb{padding:60px 8px}}
+</style>
+
+<div class="sc6">
+<!-- ============ CONTACT ȘI HARTĂ ============ -->
+<section class="sc6-sec sc6-sec--cream" id="contact">
+  <div class="sc6-wrap sc6-contact-grid">
+    <div class="sc6-contact-card">
+      <span class="sc6-eyebrow">Studioul din Galați</span>
+      <h2>Unde ne găsești</h2>
+      <ul class="sc6-clist">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0112 2.5a7 7 0 017 7C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><div><b>Adresa</b><span>Strada Macedona, Nr. 5, Galați, România</span></div></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg><div><b>Telefon</b><a href="tel:+40749270232" data-ev="call">0749 270 232</a></div></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><div><b>Email</b><a href="mailto:contact@stefanchelmu.ro">contact@stefanchelmu.ro</a></div></li>
+      </ul>
+      <div class="sc6-contact-cta">
+        <a class="sc6-btn" href="#programare">Programează ședința</a>
+        <a class="sc6-btn sc6-btn--line" href="https://www.google.com/maps/dir/?api=1&amp;destination=Strada+Macedona+5,+Gala%C8%9Bi,+Rom%C3%A2nia" target="_blank" rel="noopener">Indicații de drum</a>
+      </div>
+    </div>
+    <div class="sc6-map">
+      <iframe title="Harta: Strada Macedona 5, Galați" src="https://www.google.com/maps?q=Strada+Macedona+5,+Gala%C8%9Bi,+Rom%C3%A2nia&amp;z=16&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+    </div>
+  </div>
+</section>
+
+<footer class="sc6-foot">
+  <div class="sc6-wrap">
+    <img src="/wp-content/uploads/2023/11/Logo-stefan-chelmu-alb.png" alt="Ștefan Chelmu" width="135" height="30">
+    <span>Studioul din Galați · <a href="tel:+40749270232" data-ev="call">0749 270 232</a> · <a href="/termeni-si-conditii">Termeni și condiții</a></span>
+  </div>
+</footer>
+
+<div class="sc6-bar" id="sc6Bar">
+  <a class="sc6-call" href="tel:+40749270232" data-ev="call" aria-label="Sună la 0749 270 232"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg></a>
+  <span class="sc6-bar-price">De la <b><span data-price="foto">450</span> lei</b></span>
+  <a class="sc6-btn" href="#programare">Programează ședința</a>
+</div>
+
+<div class="sc6-lb" id="sc6Lb" role="dialog" aria-modal="true" aria-label="Fotografie mărită">
+  <img alt="">
+  <button type="button" class="x" aria-label="Închide">&times;</button>
+  <button type="button" class="p" aria-label="Fotografia anterioară">&#8249;</button>
+  <button type="button" class="n" aria-label="Fotografia următoare">&#8250;</button>
+</div>
+</div>
+
+<script>
+(function(){
+  var $=function(q,c){return (c||document).querySelector(q)}, $$=function(q,c){return Array.prototype.slice.call((c||document).querySelectorAll(q))};
+  if(!$('#sc6')) return;
+
+  /* ---- prețurile și reducerea, din plugin ---- */
+  var MONTHS=['ianuarie','februarie','martie','aprilie','mai','iunie','iulie','august','septembrie','octombrie','noiembrie','decembrie'];
+  fetch('/wp-json/scp/v1/config',{cache:'no-store',credentials:'omit'}).then(function(r){return r.ok?r.json():null}).then(function(c){
+    if(!c||!c.quotes) return;
+    var q=c.quotes, early=false;
+    Object.keys(q).forEach(function(k){
+      if(q[k].discount>0) early=true;
+      $$('[data-price="'+k+'"]').forEach(function(e){e.textContent=Math.round(q[k].price)});
+      $$('[data-list="'+k+'"]').forEach(function(e){e.textContent=Math.round(q[k].list)});
+      $$('[data-discount="'+k+'"]').forEach(function(e){e.textContent=Math.round(q[k].discount)});
+    });
+    $$('[data-pay-hours]').forEach(function(e){e.textContent=c.pay_hours||48});
+    $$('[data-early]').forEach(function(e){ if(early) e.removeAttribute('hidden'); else e.parentNode.removeChild(e); });
+  }).catch(function(){});
+
+  /* ---- butoanele de pachet: duc la formular și aleg pachetul ---- */
+  var wanted=null;
+  function applyPick(){
+    if(!wanted) return true;
+    var r=$('.scp input[name="package"][value="'+wanted+'"]');
+    if(!r) return false;
+    if(!r.disabled && !r.checked){ r.checked=true; r.dispatchEvent(new Event('change',{bubbles:true})); }
+    wanted=null; return true;
+  }
+  $$('[data-pick]').forEach(function(a){
+    a.addEventListener('click',function(){
+      wanted=a.getAttribute('data-pick');
+      try{ window.dataLayer=window.dataLayer||[]; window.dataLayer.push({event:'sc6_pick',scp_package:wanted}); }catch(e){}
+      if(!applyPick()){ var n=0, t=setInterval(function(){ if(applyPick()||++n>40) clearInterval(t) },150); }
+    });
+  });
+  // linkuri din reclame sau postări: ...#programare?pachet=foto_plus  sau  ?pachet=foto
+  var m=(location.search+location.hash).match(/pachet=(foto_plus|foto)/);
+  if(m){ wanted=m[1]; var n0=0, t0=setInterval(function(){ if(applyPick()||++n0>60) clearInterval(t0) },200); }
+
+  /* ---- meniu și bara de programare ---- */
+  var nav=$('#sc6Nav'), bar=$('#sc6Bar'), hero=$('.sc6-hero'), formEl=null;
+  function onScroll(){
+    var y=window.scrollY||window.pageYOffset, vh=window.innerHeight;
+    nav.classList.toggle('is-solid',y>30);
+    formEl=formEl||$('.elementor-element-sc6form')||$('.scp');
+    var head=$('#programare'), top=head?head.getBoundingClientRect().top:1e9;
+    var bottom=formEl?formEl.getBoundingClientRect().bottom:-1;
+    var formOnScreen=top<vh*.85 && bottom>vh*.15;
+    bar.classList.toggle('is-on', y>(hero?hero.offsetHeight*.6:300) && !formOnScreen);
+  }
+  var burger=$('#sc6Burger');
+  function menu(open){ nav.classList.toggle('is-open',open); burger.setAttribute('aria-expanded',String(open)); burger.setAttribute('aria-label',open?'Închide meniul':'Deschide meniul'); }
+  if(burger){
+    burger.addEventListener('click',function(){ menu(!nav.classList.contains('is-open')) });
+    $$('#sc6Menu a').forEach(function(a){ a.addEventListener('click',function(){ menu(false) }) });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&nav.classList.contains('is-open')){ menu(false); burger.focus() } });
+    document.addEventListener('click',function(e){ if(nav.classList.contains('is-open')&&!nav.contains(e.target)) menu(false) });
+    window.addEventListener('resize',function(){ if(window.innerWidth>1020) menu(false) });
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); window.addEventListener('resize',onScroll); onScroll();
+
+  /* ---- hero: decorurile se schimbă pe rând în arcadă ---- */
+  var arch=$('#sc6Arch');
+  if(arch){
+    var ims=$$('.slides img',arch), dts=$$('.dots button',arch), nm=$('.nm',arch), ai=0, at=null;
+    var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function sh(n){ ai=(n+ims.length)%ims.length; ims.forEach(function(im,k){im.classList.toggle('is-on',k===ai)}); dts.forEach(function(d,k){d.setAttribute('aria-pressed',String(k===ai))}); nm.textContent=ims[ai].getAttribute('data-name'); }
+    function pl(){ if(still) return; st(); at=setInterval(function(){sh(ai+1)},5000); }
+    function st(){ if(at){clearInterval(at);at=null} }
+    dts.forEach(function(d,k){ d.addEventListener('click',function(){sh(k);pl()}) });
+    arch.addEventListener('mouseenter',st); arch.addEventListener('mouseleave',pl);
+    document.addEventListener('visibilitychange',function(){ document.hidden?st():pl() });
+    pl();
+  }
+
+  /* ---- întrebări ---- */
+  $$('#sc6Faq .sc6-qa').forEach(function(q){
+    var b=$('button',q);
+    b.addEventListener('click',function(){
+      var open=!q.classList.contains('is-open');
+      $$('#sc6Faq .sc6-qa').forEach(function(x){ x.classList.remove('is-open'); $('button',x).setAttribute('aria-expanded','false'); });
+      if(open){ q.classList.add('is-open'); b.setAttribute('aria-expanded','true'); }
+    });
+  });
+
+  /* ---- galerie: filtre pe ani, primele 12 la început, lightbox pe pozele vizibile ---- */
+  var gal=$('#sc6Gal'), all=$$('#sc6Gal button'), more=$('#sc6More'), filt='all', expanded=false, LIMIT=12;
+  function visible(){ return all.filter(function(b){ return !b.hidden }); }
+  function apply(){
+    var n=0, total=0;
+    all.forEach(function(b){
+      var ok = filt==='all' || b.getAttribute('data-y')===filt;
+      if(ok) total++;
+      b.hidden = !ok || (filt==='all' && !expanded && n>=LIMIT);
+      if(ok) n++;
+    });
+    more.parentNode.hidden = !(filt==='all' && !expanded && total>LIMIT);
+    more.textContent='Arată toate fotografiile ('+total+')';
+  }
+  $$('.sc6-filt button').forEach(function(c){
+    c.addEventListener('click',function(){
+      filt=c.getAttribute('data-f');
+      $$('.sc6-filt button').forEach(function(x){ var on=x===c; x.classList.toggle('is-on',on); x.setAttribute('aria-pressed',on?'true':'false'); });
+      apply();
+    });
+  });
+  more.addEventListener('click',function(){ expanded=true; apply(); });
+  apply();
+  var lb=$('#sc6Lb'), lbi=$('img',lb), items=[], idx=0;
+  function show(){ var b=items[idx], im=$('img',b); lbi.src=b.getAttribute('data-full')||im.currentSrc||im.src; lbi.alt=im.alt; }
+  function open(b){ items=visible(); idx=Math.max(0,items.indexOf(b)); show(); lb.classList.add('is-open'); document.documentElement.style.overflow='hidden'; $('.x',lb).focus(); }
+  function close(){ lb.classList.remove('is-open'); document.documentElement.style.overflow=''; if(items[idx]) items[idx].focus(); }
+  function step(d){ idx=(idx+d+items.length)%items.length; show(); }
+  all.forEach(function(b){ b.addEventListener('click',function(){open(b)}) });
+  $('.x',lb).onclick=close; $('.p',lb).onclick=function(){step(-1)}; $('.n',lb).onclick=function(){step(1)};
+  lb.addEventListener('click',function(e){ if(e.target===lb) close(); });
+  document.addEventListener('keydown',function(e){ if(!lb.classList.contains('is-open')) return; if(e.key==='Escape') close(); if(e.key==='ArrowLeft') step(-1); if(e.key==='ArrowRight') step(1); });
+  var tx=0; lb.addEventListener('touchstart',function(e){tx=e.touches[0].clientX},{passive:true});
+  lb.addEventListener('touchend',function(e){ var d=e.changedTouches[0].clientX-tx; if(Math.abs(d)>50) step(d<0?1:-1); });
+
+  /* ---- măsurare: doar în dataLayer; din GTM pleacă mai departe, după consimțământ ---- */
+  $$('[data-ev="voucher"]').forEach(function(a){ a.addEventListener('click',function(){ try{ window.dataLayer=window.dataLayer||[]; window.dataLayer.push({event:'sc6_voucher',scp_link:a.getAttribute('href')}); }catch(e){} }); });
+  $$('[data-ev="call"]').forEach(function(a){ a.addEventListener('click',function(){ try{ window.dataLayer=window.dataLayer||[]; window.dataLayer.push({event:'sc6_call'}); }catch(e){} }); });
+})();
+</script>

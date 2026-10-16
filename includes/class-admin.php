@@ -1,0 +1,1365 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Zona de administrare: panou, programări, calendar, setări, jurnal webhook.
+ */
+class SCP_Admin {
+
+	const SLUG = 'scp';
+
+	public static function init(): void {
+		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_action( 'admin_post_scp_save_booking', array( __CLASS__, 'save_booking' ) );
+		add_action( 'admin_post_scp_booking_action', array( __CLASS__, 'booking_action' ) );
+		add_action( 'admin_post_scp_save_settings', array( __CLASS__, 'save_settings' ) );
+		add_action( 'admin_post_scp_export', array( __CLASS__, 'export_csv' ) );
+		add_action( 'admin_post_scp_voucher', array( __CLASS__, 'voucher_action' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( SCP_FILE ), array( __CLASS__, 'action_links' ) );
+		add_action( 'in_admin_header', array( __CLASS__, 'quiet_notices' ), 1000 );
+	}
+
+	/** Pe paginile pluginului ascundem notificările altor pluginuri (reclame, sfaturi), ca să rămână doar ce contează. */
+	public static function quiet_notices(): void {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( $screen && str_contains( (string) $screen->id, 'scp' ) ) {
+			remove_all_actions( 'admin_notices' );
+			remove_all_actions( 'all_admin_notices' );
+		}
+	}
+
+	public static function action_links( array $links ): array {
+		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=scp-settings' ) ) . '">Setări</a>' );
+		return $links;
+	}
+
+	public static function menu(): void {
+		$cap   = SCP_Install::CAP;
+		$count = self::today_count();
+		$badge = $count ? ' <span class="awaiting-mod count-' . $count . '"><span class="pending-count">' . $count . '</span></span>' : '';
+
+		add_menu_page( 'Programări Crăciun', 'Programări' . $badge, $cap, self::SLUG, array( __CLASS__, 'page_dashboard' ), 'dashicons-calendar-alt', 26 );
+		add_submenu_page( self::SLUG, 'Panou', 'Panou', $cap, self::SLUG, array( __CLASS__, 'page_dashboard' ) );
+		add_submenu_page( self::SLUG, 'Programări', 'Toate programările', $cap, 'scp-bookings', array( __CLASS__, 'page_bookings' ) );
+		add_submenu_page( self::SLUG, 'Calendar', 'Calendar și blocări', $cap, 'scp-calendar', array( __CLASS__, 'page_calendar' ) );
+		add_submenu_page( self::SLUG, 'Vouchere', 'Vouchere cadou', $cap, 'scp-vouchers', array( __CLASS__, 'page_vouchers' ) );
+		add_submenu_page( self::SLUG, 'Setări', 'Setări', 'manage_options', 'scp-settings', array( __CLASS__, 'page_settings' ) );
+		add_submenu_page( self::SLUG, 'Jurnal webhook', 'Jurnal webhook', 'manage_options', 'scp-webhook', array( __CLASS__, 'page_webhook' ) );
+	}
+
+	private static function today_count(): int {
+		global $wpdb;
+		$t = SCP_Install::table( 'bookings' );
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$t} WHERE active_slot IS NOT NULL AND slot_date = %s", SCP_Helpers::now()->format( 'Y-m-d' ) ) );
+	}
+
+	public static function assets( string $hook ): void {
+		if ( ! str_contains( $hook, 'scp' ) ) {
+			return;
+		}
+		wp_enqueue_style( 'scp-admin', SCP_URL . 'assets/css/admin.css', array(), SCP_VERSION );
+		wp_enqueue_script( 'scp-admin', SCP_URL . 'assets/js/admin.js', array(), SCP_VERSION, true );
+		wp_localize_script(
+			'scp-admin',
+			'SCP_ADMIN',
+			array(
+				'api'        => esc_url_raw( rest_url( SCP_Rest::NS . '/admin' ) ),
+				'nonce'      => wp_create_nonce( 'wp_rest' ),
+				'newUrl'     => admin_url( 'admin.php?page=scp-bookings&new=1' ),
+				'bookingUrl' => admin_url( 'admin.php?page=scp-bookings&booking=' ),
+				'start'      => SCP_Settings::get( 'start_date' ),
+				'end'        => SCP_Settings::get( 'end_date' ),
+				'today'      => SCP_Helpers::now()->format( 'Y-m-d' ),
+			)
+		);
+	}
+
+	/* =========================================================
+	 * Utilitare de afișare
+	 * ======================================================= */
+
+	private static function notice(): void {
+		$map = array(
+			'saved'      => array( 'success', 'Modificările au fost salvate.' ),
+			'created'    => array( 'success', 'Programarea a fost adăugată.' ),
+			'link_sent'  => array( 'success', 'Linkul de plată a fost trimis pe email.' ),
+			'resent'     => array( 'success', 'Confirmarea a fost retrimisă.' ),
+			'cancelled'  => array( 'success', 'Programarea a fost anulată, iar ora a redevenit liberă.' ),
+			'settings'   => array( 'success', 'Setările au fost salvate.' ),
+		);
+		$key = isset( $_GET['scp_msg'] ) ? sanitize_key( wp_unslash( $_GET['scp_msg'] ) ) : ''; // phpcs:ignore
+		if ( isset( $map[ $key ] ) ) {
+			printf( '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $map[ $key ][0] ), esc_html( $map[ $key ][1] ) );
+		}
+		$err = get_transient( 'scp_admin_error_' . get_current_user_id() );
+		if ( $err ) {
+			delete_transient( 'scp_admin_error_' . get_current_user_id() );
+			printf( '<div class="notice notice-error is-dismissible"><p>%s</p></div>', esc_html( $err ) );
+		}
+	}
+
+	private static function fail( string $msg, string $url ): void {
+		set_transient( 'scp_admin_error_' . get_current_user_id(), $msg, 60 );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	private static function badge( string $type, string $value ): string {
+		$labels = 'pay' === $type ? SCP_Helpers::PAYMENT_STATUSES : ( 'source' === $type ? SCP_Helpers::SOURCES : SCP_Helpers::STATUSES );
+		return '<span class="scp-badge scp-badge--' . esc_attr( $type . '-' . $value ) . '">' . esc_html( $labels[ $value ] ?? $value ) . '</span>';
+	}
+
+	private static function pkg_label( string $key ): string {
+		return SCP_Settings::packages()[ $key ]['label'] ?? $key;
+	}
+
+	private static function header( string $title, string $actions = '' ): void {
+		echo '<div class="wrap scp-admin">';
+		echo '<div class="scp-admin-head"><h1>' . esc_html( $title ) . '</h1><div class="scp-admin-actions">' . $actions . '</div></div>'; // phpcs:ignore
+		echo '<hr class="wp-header-end">';
+		self::notice();
+	}
+
+	private static function footer(): void {
+		echo '</div>';
+	}
+
+	private static function slot_label( array $b ): string {
+		return ucfirst( SCP_Helpers::date_long( $b['slot_date'] ) ) . ', ' . $b['slot_time'];
+	}
+
+	/* =========================================================
+	 * Panou
+	 * ======================================================= */
+
+	public static function page_dashboard(): void {
+		$s        = SCP_Bookings::stats();
+		$target   = max( 1, $s['target'] );
+		$pct      = min( 100, round( $s['active'] / $target * 100 ) );
+		$capacity = $s['booked'] + $s['free'];
+		$occ      = $capacity ? round( $s['booked'] / $capacity * 100 ) : 0;
+		$paid     = 0;
+		$paid_n   = 0;
+		foreach ( $s['by_pay'] as $r ) {
+			if ( in_array( $r['payment_status'], array( 'paid', 'cash', 'voucher' ), true ) ) {
+				$paid   += (float) $r['v'];
+				$paid_n += (int) $r['n'];
+			}
+		}
+		$open = (bool) SCP_Settings::get( 'booking_open' );
+
+		$actions = '<a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=scp-bookings&new=1' ) ) . '">Adaugă programare</a> <a class="button" href="' . esc_url( admin_url( 'admin.php?page=scp-calendar' ) ) . '">Calendar</a>';
+		self::header( 'Programări Crăciun', $actions );
+
+		if ( ! $open ) {
+			echo '<div class="notice notice-warning inline"><p>Programările online sunt <strong>închise</strong>. Clienții văd mesajul din Setări. <a href="' . esc_url( admin_url( 'admin.php?page=scp-settings' ) ) . '">Deschide-le din Setări</a>.</p></div>';
+		}
+		if ( '' === trim( (string) SCP_Settings::get( 'webhook_url' ) ) ) {
+			echo '<div class="notice notice-info inline"><p>Webhook-ul pentru n8n nu este configurat încă. <a href="' . esc_url( admin_url( 'admin.php?page=scp-settings#webhook' ) ) . '">Adaugă adresa în Setări</a>.</p></div>';
+		}
+
+		?>
+		<div class="scp-kpis">
+			<div class="scp-kpi scp-kpi--target">
+				<div class="scp-kpi-label">Programări active</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $s['active'] ); ?><span> din <?php echo esc_html( (string) $s['target'] ); ?></span></div>
+				<div class="scp-progress" role="img" aria-label="<?php echo esc_attr( $pct . '% din obiectiv' ); ?>"><span style="width:<?php echo esc_attr( (string) $pct ); ?>%"></span></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $pct . '% din obiectiv' ); ?></div>
+			</div>
+			<div class="scp-kpi">
+				<div class="scp-kpi-label">Intrate în ultimele 7 zile</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $s['last7'] ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $s['cancelled'] . ' anulate în total' ); ?></div>
+			</div>
+			<div class="scp-kpi">
+				<div class="scp-kpi-label">Ocupare de azi până la final</div>
+				<div class="scp-kpi-value"><?php echo esc_html( $occ . '%' ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $s['booked'] . ' ocupate · ' . $s['free'] . ' libere · ' . $s['blocked'] . ' blocate' ); ?></div>
+			</div>
+			<div class="scp-kpi">
+				<div class="scp-kpi-label">Valoarea programărilor active</div>
+				<div class="scp-kpi-value"><?php echo esc_html( SCP_Helpers::money( $s['value'] ) ); ?><span> lei</span></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( 'Încasat: ' . SCP_Helpers::money( $paid ) . ' lei (' . $paid_n . ' programări)' ); ?></div>
+			</div>
+		</div>
+
+		<div class="scp-grid-2">
+			<div class="scp-panel">
+				<h2>Azi, <?php echo esc_html( SCP_Helpers::date_long( SCP_Helpers::now()->format( 'Y-m-d' ) ) ); ?></h2>
+				<?php self::mini_list( $s['today'], 'Nicio ședință azi.' ); ?>
+			</div>
+			<div class="scp-panel">
+				<h2>Următoarele ședințe</h2>
+				<?php self::mini_list( $s['upcoming'], 'Nu există ședințe viitoare.', true ); ?>
+			</div>
+		</div>
+
+		<div class="scp-grid-2">
+			<div class="scp-panel">
+				<h2>Programări noi pe zile <small>ultimele 30 de zile</small></h2>
+				<?php self::bars( $s['per_day'] ); ?>
+			</div>
+			<div class="scp-panel">
+				<h2>Împărțire</h2>
+				<?php self::split( 'Pachet', $s['by_package'], 'package', fn( $k ) => self::pkg_label( $k ), $s['active'] ); ?>
+				<?php self::split( 'Plată', $s['by_pay'], 'payment_status', fn( $k ) => SCP_Helpers::PAYMENT_STATUSES[ $k ] ?? $k, $s['active'] ); ?>
+				<?php self::split( 'Sursă', $s['by_source'], 'source', fn( $k ) => SCP_Helpers::SOURCES[ $k ] ?? $k, $s['active'] ); ?>
+			</div>
+		</div>
+
+		<div class="scp-panel">
+			<h2>Ultimele intrate</h2>
+			<?php self::table( $s['recent'], true ); ?>
+		</div>
+		<?php
+		self::footer();
+	}
+
+	private static function mini_list( array $items, string $empty, bool $with_date = false ): void {
+		if ( ! $items ) {
+			echo '<p class="scp-empty">' . esc_html( $empty ) . '</p>';
+			return;
+		}
+		echo '<ul class="scp-mini">';
+		foreach ( $items as $b ) {
+			$url = admin_url( 'admin.php?page=scp-bookings&booking=' . $b['id'] );
+			echo '<li><a href="' . esc_url( $url ) . '">';
+			echo '<span class="scp-mini-time">' . esc_html( $b['slot_time'] ) . '</span>';
+			echo '<span class="scp-mini-main"><strong>' . esc_html( $b['name'] ) . '</strong><span>' . esc_html( ( $with_date ? ucfirst( SCP_Helpers::date_long( $b['slot_date'] ) ) . ' · ' : '' ) . self::pkg_label( $b['package'] ) . ( $b['phone'] ? ' · ' . $b['phone'] : '' ) ) . '</span></span>';
+			echo self::badge( 'pay', $b['payment_status'] ); // phpcs:ignore
+			echo '</a></li>';
+		}
+		echo '</ul>';
+	}
+
+	private static function bars( array $rows ): void {
+		$map = array();
+		foreach ( $rows as $r ) {
+			$map[ $r['d'] ] = (int) $r['n'];
+		}
+		$max = max( $map ? max( $map ) : 1, 1 );
+		echo '<div class="scp-bars">';
+		for ( $i = 29; $i >= 0; $i-- ) {
+			$d = SCP_Helpers::now()->modify( "-{$i} days" )->format( 'Y-m-d' );
+			$n = $map[ $d ] ?? 0;
+			$h = $n ? max( 6, round( $n / $max * 100 ) ) : 2;
+			printf(
+				'<span class="scp-bar%4$s" title="%1$s: %2$d" style="height:%3$d%%"><em>%5$s</em></span>',
+				esc_attr( SCP_Helpers::date_ro( $d ) ),
+				(int) $n,
+				(int) $h,
+				$n ? '' : ' is-zero',
+				$n ? esc_html( (string) $n ) : ''
+			);
+		}
+		echo '</div><div class="scp-bars-axis"><span>' . esc_html( SCP_Helpers::now()->modify( '-29 days' )->format( 'd.m' ) ) . '</span><span>azi</span></div>';
+	}
+
+	private static function split( string $title, array $rows, string $key, callable $label, int $total ): void {
+		echo '<div class="scp-split"><h3>' . esc_html( $title ) . '</h3>';
+		if ( ! $rows ) {
+			echo '<p class="scp-empty">Încă nu sunt date.</p></div>';
+			return;
+		}
+		foreach ( $rows as $r ) {
+			$pct = $total ? round( (int) $r['n'] / $total * 100 ) : 0;
+			echo '<div class="scp-split-row"><span class="scp-split-label">' . esc_html( $label( $r[ $key ] ) ) . '</span><span class="scp-split-track"><span style="width:' . esc_attr( (string) $pct ) . '%"></span></span><span class="scp-split-n">' . esc_html( (string) $r['n'] ) . '</span></div>';
+		}
+		echo '</div>';
+	}
+
+	/* =========================================================
+	 * Lista de programări
+	 * ======================================================= */
+
+	private static function filters_from_request(): array {
+		$g = wp_unslash( $_GET ); // phpcs:ignore
+		return array(
+			'status'         => isset( $g['status'] ) ? sanitize_key( $g['status'] ) : 'active',
+			'payment_status' => isset( $g['payment_status'] ) ? sanitize_key( $g['payment_status'] ) : '',
+			'package'        => isset( $g['package'] ) ? sanitize_key( $g['package'] ) : '',
+			'source'         => isset( $g['source'] ) ? sanitize_key( $g['source'] ) : '',
+			'from'           => isset( $g['from'] ) ? sanitize_text_field( $g['from'] ) : '',
+			'to'             => isset( $g['to'] ) ? sanitize_text_field( $g['to'] ) : '',
+			'search'         => isset( $g['s'] ) ? sanitize_text_field( $g['s'] ) : '',
+			'orderby'        => isset( $g['orderby'] ) ? sanitize_key( $g['orderby'] ) : 'slot',
+			'order'          => isset( $g['order'] ) ? sanitize_key( $g['order'] ) : 'asc',
+			'page'           => isset( $g['paged'] ) ? max( 1, (int) $g['paged'] ) : 1,
+			'per_page'       => 50,
+		);
+	}
+
+	public static function page_bookings(): void {
+		if ( isset( $_GET['booking'] ) || isset( $_GET['new'] ) ) { // phpcs:ignore
+			self::page_booking_edit();
+			return;
+		}
+		$f   = self::filters_from_request();
+		$q   = SCP_Bookings::query( 'all' === $f['status'] ? array_merge( $f, array( 'status' => '' ) ) : $f );
+		$exp = wp_nonce_url( add_query_arg( array_merge( array( 'action' => 'scp_export' ), array_filter( $f ) ), admin_url( 'admin-post.php' ) ), 'scp_export' );
+
+		$actions = '<a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=scp-bookings&new=1' ) ) . '">Adaugă programare</a> <a class="button" href="' . esc_url( $exp ) . '">Export CSV</a>';
+		self::header( 'Programări', $actions );
+		?>
+		<form class="scp-filters" method="get">
+			<input type="hidden" name="page" value="scp-bookings">
+			<label><span>Caută</span><input type="search" name="s" value="<?php echo esc_attr( $f['search'] ); ?>" placeholder="nume, telefon, email, cod"></label>
+			<label><span>Status</span>
+				<select name="status">
+					<option value="active" <?php selected( $f['status'], 'active' ); ?>>Active</option>
+					<option value="all" <?php selected( $f['status'], 'all' ); ?>>Toate</option>
+					<?php foreach ( SCP_Helpers::STATUSES as $k => $l ) : ?>
+						<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $f['status'], $k ); ?>><?php echo esc_html( $l ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<label><span>Plată</span>
+				<select name="payment_status">
+					<option value="">Oricare</option>
+					<?php foreach ( SCP_Helpers::PAYMENT_STATUSES as $k => $l ) : ?>
+						<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $f['payment_status'], $k ); ?>><?php echo esc_html( $l ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<label><span>Pachet</span>
+				<select name="package">
+					<option value="">Oricare</option>
+					<?php foreach ( SCP_Settings::packages() as $k => $p ) : ?>
+						<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $f['package'], $k ); ?>><?php echo esc_html( $p['label'] ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<label><span>De la</span><input type="date" name="from" value="<?php echo esc_attr( $f['from'] ); ?>"></label>
+			<label><span>Până la</span><input type="date" name="to" value="<?php echo esc_attr( $f['to'] ); ?>"></label>
+			<label><span>Ordine</span>
+				<select name="orderby">
+					<option value="slot" <?php selected( $f['orderby'], 'slot' ); ?>>După data ședinței</option>
+					<option value="created" <?php selected( $f['orderby'], 'created' ); ?>>După data intrării</option>
+				</select>
+			</label>
+			<input type="hidden" name="order" value="<?php echo esc_attr( 'created' === $f['orderby'] ? 'desc' : $f['order'] ); ?>">
+			<button class="button">Filtrează</button>
+			<a class="scp-reset" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings' ) ); ?>">Resetează</a>
+		</form>
+		<p class="scp-count"><?php echo esc_html( $q['total'] . ( 1 === $q['total'] ? ' programare' : ' programări' ) ); ?></p>
+		<div class="scp-panel scp-panel--flush">
+			<?php self::table( $q['items'] ); ?>
+		</div>
+		<?php
+		$pages = (int) ceil( $q['total'] / $f['per_page'] );
+		if ( $pages > 1 ) {
+			echo '<div class="scp-pages">';
+			echo paginate_links( // phpcs:ignore
+				array(
+					'base'    => add_query_arg( 'paged', '%#%' ),
+					'format'  => '',
+					'current' => $f['page'],
+					'total'   => $pages,
+				)
+			);
+			echo '</div>';
+		}
+		self::footer();
+	}
+
+	private static function table( array $items, bool $compact = false ): void {
+		if ( ! $items ) {
+			echo '<p class="scp-empty scp-empty--pad">Nicio programare pentru filtrele alese.</p>';
+			return;
+		}
+		echo '<table class="scp-table"><thead><tr><th>Ședința</th><th>Client</th><th>Pachet</th><th>Plată</th>';
+		if ( ! $compact ) {
+			echo '<th>Status</th><th>Sursă</th>';
+		}
+		echo '<th>Intrată</th></tr></thead><tbody>';
+		foreach ( $items as $b ) {
+			$url = admin_url( 'admin.php?page=scp-bookings&booking=' . $b['id'] );
+			$cls = 'cancelled' === $b['status'] ? ' class="is-cancelled"' : '';
+			echo '<tr' . $cls . ' data-href="' . esc_url( $url ) . '">'; // phpcs:ignore
+			echo '<td class="scp-td-slot"><a href="' . esc_url( $url ) . '"><strong>' . esc_html( SCP_Helpers::date_ro( $b['slot_date'] ) ) . '</strong> <span>' . esc_html( $b['slot_time'] ) . '</span><small>' . esc_html( SCP_Helpers::WEEKDAYS[ SCP_Helpers::weekday( $b['slot_date'] ) ] ) . '</small></a></td>';
+			echo '<td><strong>' . esc_html( $b['name'] ) . '</strong><small>' . esc_html( trim( $b['phone'] . ( $b['email'] ? ' · ' . $b['email'] : '' ), ' ·' ) ) . '</small></td>';
+			echo '<td>' . esc_html( self::pkg_label( $b['package'] ) ) . '<small>' . esc_html( SCP_Helpers::money( $b['price'] ) ) . ' lei</small></td>';
+			echo '<td>' . self::badge( 'pay', $b['payment_status'] ) . '</td>'; // phpcs:ignore
+			if ( ! $compact ) {
+				echo '<td>' . self::badge( 'status', $b['status'] ) . '</td>'; // phpcs:ignore
+				echo '<td>' . esc_html( SCP_Helpers::SOURCES[ $b['source'] ] ?? $b['source'] ) . '</td>';
+			}
+			echo '<td><small class="scp-nowrap">' . esc_html( ( new DateTimeImmutable( $b['created_at'], SCP_Helpers::tz() ) )->format( 'd.m H:i' ) ) . '</small></td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+	}
+
+	/* =========================================================
+	 * Fișa programării (adăugare / modificare)
+	 * ======================================================= */
+
+	private static function page_booking_edit(): void {
+		$id  = isset( $_GET['booking'] ) ? (int) $_GET['booking'] : 0; // phpcs:ignore
+		$b   = $id ? SCP_Bookings::get( $id ) : null;
+		$new = ! $b;
+		if ( $id && ! $b ) {
+			self::header( 'Programare' );
+			echo '<p>Programarea nu există. <a href="' . esc_url( admin_url( 'admin.php?page=scp-bookings' ) ) . '">Înapoi la listă</a></p>';
+			self::footer();
+			return;
+		}
+		$packages = SCP_Settings::packages();
+		$g        = wp_unslash( $_GET ); // phpcs:ignore
+		$v        = $b ?: array(
+			'slot_date'      => isset( $g['date'] ) && SCP_Helpers::is_date( $g['date'] ) ? $g['date'] : '',
+			'slot_time'      => isset( $g['time'] ) && SCP_Helpers::is_time( $g['time'] ) ? $g['time'] : '',
+			'package'        => (string) array_key_first( $packages ),
+			'price'          => '',
+			'name'           => '',
+			'email'          => '',
+			'phone'          => '',
+			'message'        => '',
+			'notes'          => '',
+			'status'         => 'confirmed',
+			'payment_status' => 'unpaid',
+			'source'         => 'phone',
+			'discount_source'=> '',
+			'discount_code'  => '',
+		);
+
+		$back = '<a class="button" href="' . esc_url( admin_url( 'admin.php?page=scp-bookings' ) ) . '">Înapoi la listă</a>';
+		self::header( $new ? 'Programare nouă' : 'Programarea ' . $b['code'], $back );
+		?>
+		<div class="scp-edit">
+			<form class="scp-panel scp-edit-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'scp_save_booking' ); ?>
+				<input type="hidden" name="action" value="scp_save_booking">
+				<input type="hidden" name="id" value="<?php echo esc_attr( (string) ( $b['id'] ?? 0 ) ); ?>">
+
+				<h2>Ședința</h2>
+				<div class="scp-form-grid">
+					<label><span>Data</span><input type="date" name="date" id="scp-date" required value="<?php echo esc_attr( $v['slot_date'] ); ?>"></label>
+					<label><span>Ora</span>
+						<select name="time" id="scp-time" data-current="<?php echo esc_attr( $v['slot_time'] ); ?>" data-booking="<?php echo esc_attr( (string) ( $b['id'] ?? 0 ) ); ?>" required>
+							<?php if ( $v['slot_time'] ) : ?>
+								<option value="<?php echo esc_attr( $v['slot_time'] ); ?>" selected><?php echo esc_html( $v['slot_time'] ); ?></option>
+							<?php else : ?>
+								<option value="">Alege data mai întâi</option>
+							<?php endif; ?>
+						</select>
+					</label>
+					<label class="scp-custom-time"><span>Altă oră</span><input type="time" name="custom_time" step="300" placeholder="hh:mm"><em>Doar dacă ora nu e în listă.</em></label>
+					<label><span>Pachet</span>
+						<select name="package">
+							<?php foreach ( $packages as $k => $p ) : ?>
+								<option value="<?php echo esc_attr( $k ); ?>" data-price="<?php echo esc_attr( (string) $p['price'] ); ?>" <?php selected( $v['package'], $k ); ?>><?php echo esc_html( $p['label'] . ' – ' . SCP_Helpers::money( $p['price'] ) . ' lei' ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+					<label><span>Voucher cadou</span><input type="text" name="voucher" class="scp-mono" value="<?php echo esc_attr( 'gift' === ( $v['discount_source'] ?? '' ) ? $v['discount_code'] : '' ); ?>" placeholder="opțional"><em>Cu voucher, programarea e plătită integral.</em></label>
+					<label><span>Preț de plată (lei)</span><input type="text" inputmode="decimal" name="price" value="<?php echo esc_attr( '' === $v['price'] ? '' : SCP_Helpers::money( $v['price'] ) ); ?>" placeholder="calculat automat"><em>Scrie altă sumă doar pentru un preț special.</em></label>
+				</div>
+				<?php if ( ! $new && $b['discount'] > 0 ) : ?>
+					<p class="scp-price-note">
+						<?php
+						$src = array(
+							'early'   => (string) SCP_Settings::get( 'early_label' ),
+							'gift'    => 'Voucher ' . $b['discount_code'],
+							'manual'  => 'Preț stabilit manual',
+						)[ $b['discount_source'] ] ?? '';
+						echo esc_html( SCP_Helpers::money( $b['list_price'] ) . ' lei − ' . SCP_Helpers::money( $b['discount'] ) . ' lei' . ( $src ? ' (' . $src . ')' : '' ) . ' = ' . SCP_Helpers::money( $b['price'] ) . ' lei' );
+						?>
+					</p>
+				<?php endif; ?>
+				<p class="scp-slot-hint" id="scp-slot-hint" aria-live="polite"></p>
+
+				<h2>Client</h2>
+				<div class="scp-form-grid">
+					<label class="scp-wide"><span>Nume și prenume</span><input type="text" name="name" required value="<?php echo esc_attr( $v['name'] ); ?>"></label>
+					<label><span>Telefon</span><input type="tel" name="phone" value="<?php echo esc_attr( $v['phone'] ); ?>"></label>
+					<label><span>Email</span><input type="email" name="email" value="<?php echo esc_attr( $v['email'] ); ?>"></label>
+					<label class="scp-wide"><span>Mesajul clientului</span><textarea name="message" rows="2"><?php echo esc_textarea( (string) $v['message'] ); ?></textarea></label>
+					<label class="scp-wide"><span>Observații interne</span><textarea name="notes" rows="2" placeholder="Nu le vede clientul"><?php echo esc_textarea( (string) $v['notes'] ); ?></textarea></label>
+				</div>
+
+				<h2>Status</h2>
+				<div class="scp-form-grid">
+					<label><span>Programare</span>
+						<select name="status">
+							<?php foreach ( SCP_Helpers::STATUSES as $k => $l ) : ?>
+								<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $v['status'], $k ); ?>><?php echo esc_html( $l ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+					<label><span>Plată</span>
+						<select name="payment_status">
+							<?php foreach ( SCP_Helpers::PAYMENT_STATUSES as $k => $l ) : ?>
+								<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $v['payment_status'], $k ); ?>><?php echo esc_html( $l ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+					<?php if ( $new ) : ?>
+						<label><span>Sursă</span>
+							<select name="source">
+								<option value="phone" selected>Telefon</option>
+								<option value="admin">Admin</option>
+							</select>
+						</label>
+					<?php endif; ?>
+				</div>
+
+				<div class="scp-checks">
+					<?php if ( $new ) : ?>
+						<?php if ( (int) SCP_Settings::get( 'pay_hours' ) > 0 ) : ?>
+							<label><input type="checkbox" name="require_payment" value="1" checked> Cere plata online în <?php echo esc_html( (string) SCP_Settings::get( 'pay_hours' ) ); ?> de ore (altfel programarea e confirmată direct)</label>
+						<?php endif; ?>
+						<label><input type="checkbox" name="send_confirmation" value="1" checked> Trimite emailul clientului (dacă are email)</label>
+					<?php else : ?>
+						<label><input type="checkbox" name="notify_client" value="1" checked> Anunță clientul pe email dacă mut sau anulez programarea</label>
+					<?php endif; ?>
+				</div>
+
+				<div class="scp-edit-submit">
+					<button class="button button-primary button-large"><?php echo $new ? 'Salvează programarea' : 'Salvează modificările'; ?></button>
+				</div>
+			</form>
+
+			<?php if ( ! $new ) : ?>
+				<aside class="scp-edit-side">
+					<div class="scp-panel scp-summary-card">
+						<div class="scp-summary-when"><?php echo esc_html( self::slot_label( $b ) ); ?></div>
+						<div class="scp-summary-badges"><?php echo self::badge( 'status', $b['status'] ) . ' ' . self::badge( 'pay', $b['payment_status'] ); // phpcs:ignore ?></div>
+						<dl>
+							<dt>Cod</dt><dd class="scp-mono"><?php echo esc_html( $b['code'] ); ?></dd>
+							<dt>Sursă</dt><dd><?php echo esc_html( SCP_Helpers::SOURCES[ $b['source'] ] ?? $b['source'] ); ?></dd>
+							<dt>Intrată</dt><dd><?php echo esc_html( ( new DateTimeImmutable( $b['created_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) ); ?></dd>
+							<dt>Modificată</dt><dd><?php echo esc_html( ( new DateTimeImmutable( $b['updated_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) ); ?></dd>
+							<?php if ( 'pending' === $b['status'] && $b['pay_by'] ) : ?>
+								<dt>Plată până</dt><dd><strong><?php echo esc_html( ( new DateTimeImmutable( $b['pay_by'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) ); ?></strong></dd>
+							<?php endif; ?>
+							<?php if ( $b['cancel_reason'] ) : ?>
+								<dt>Motiv anulare</dt><dd><?php echo esc_html( 'expired' === $b['cancel_reason'] ? 'Neplătită în termen' : 'Anulată din admin' ); ?></dd>
+							<?php endif; ?>
+							<?php if ( $b['payment_link_sent_at'] ) : ?>
+								<dt>Link plată trimis</dt><dd><?php echo esc_html( ( new DateTimeImmutable( $b['payment_link_sent_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) ); ?></dd>
+							<?php endif; ?>
+							<?php if ( $b['paid_at'] ) : ?>
+								<dt>Plătită</dt><dd><?php echo esc_html( ( new DateTimeImmutable( $b['paid_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) ); ?></dd>
+							<?php endif; ?>
+							<?php if ( $b['order_id'] ) : ?>
+								<dt>Comandă</dt><dd><a href="<?php echo esc_url( admin_url( 'post.php?post=' . $b['order_id'] . '&action=edit' ) ); ?>">#<?php echo esc_html( (string) $b['order_id'] ); ?></a></dd>
+							<?php endif; ?>
+							<?php if ( ! empty( $b['meta']['utm']['utm_source'] ) || ! empty( $b['meta']['utm']['referrer'] ) ) : ?>
+								<dt>Venit din</dt><dd><?php echo esc_html( $b['meta']['utm']['utm_source'] ?? wp_parse_url( $b['meta']['utm']['referrer'], PHP_URL_HOST ) ); ?></dd>
+							<?php endif; ?>
+						</dl>
+					</div>
+
+					<?php if ( 'cancelled' !== $b['status'] ) : ?>
+						<div class="scp-panel">
+							<h2>Plată online</h2>
+							<?php $pay = SCP_Bookings::payment_url( $b ); ?>
+							<?php if ( $pay ) : ?>
+								<div class="scp-copy">
+									<input type="text" readonly value="<?php echo esc_attr( $pay ); ?>" id="scp-pay-url">
+									<button type="button" class="button" data-copy="#scp-pay-url">Copiază</button>
+								</div>
+								<?php self::action_button( $b['id'], 'payment_link', $b['payment_link_sent_at'] ? 'Retrimite linkul pe email' : 'Trimite linkul pe email', 'button-primary', ! $b['email'] ); ?>
+								<?php if ( ! $b['email'] ) : ?>
+									<p class="description">Programarea nu are email. Copiază linkul și trimite-l pe WhatsApp sau SMS.</p>
+								<?php else : ?>
+									<p class="description">Linkul conține doar un cod al programării, fără date personale. La plată, statusul devine automat „Plătită online”.</p>
+								<?php endif; ?>
+							<?php else : ?>
+								<p>Completează în <a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-settings#plata' ) ); ?>">Setări</a> adresa paginii de plată.</p>
+							<?php endif; ?>
+						</div>
+
+						<div class="scp-panel">
+							<h2>Alte acțiuni</h2>
+							<?php if ( 'pending' === $b['status'] ) : ?>
+								<?php self::action_button( $b['id'], 'extend', 'Prelungește termenul cu 24 de ore' ); ?>
+							<?php endif; ?>
+							<?php self::action_button( $b['id'], 'resend', 'pending' === $b['status'] ? 'Retrimite emailul cu linkul de plată' : 'Retrimite confirmarea', '', ! $b['email'] ); ?>
+							<?php self::action_button( $b['id'], 'cancel', 'Anulează programarea', 'scp-danger', false, 'Sigur anulezi programarea? Ora redevine liberă pentru alți clienți.' ); ?>
+						</div>
+					<?php endif; ?>
+
+					<?php $log = SCP_Webhook::log( 10, $b['id'] ); ?>
+					<?php if ( $log ) : ?>
+						<div class="scp-panel">
+							<h2>Trimiteri către n8n</h2>
+							<ul class="scp-hooklist">
+								<?php foreach ( $log as $l ) : ?>
+									<li><span class="scp-dot scp-dot--<?php echo esc_attr( $l['status'] ); ?>"></span><?php echo esc_html( $l['event'] ); ?><small><?php echo esc_html( ( new DateTimeImmutable( $l['created_at'], SCP_Helpers::tz() ) )->format( 'd.m H:i' ) . ( $l['response_code'] ? ' · HTTP ' . $l['response_code'] : '' ) ); ?></small></li>
+								<?php endforeach; ?>
+							</ul>
+						</div>
+					<?php endif; ?>
+				</aside>
+			<?php endif; ?>
+		</div>
+		<?php
+		self::footer();
+	}
+
+	private static function action_button( int $id, string $do, string $label, string $cls = '', bool $disabled = false, string $confirm = '' ): void {
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-inline-form" <?php echo $confirm ? 'data-confirm="' . esc_attr( $confirm ) . '"' : ''; ?>>
+			<?php wp_nonce_field( 'scp_booking_action_' . $id ); ?>
+			<input type="hidden" name="action" value="scp_booking_action">
+			<input type="hidden" name="id" value="<?php echo esc_attr( (string) $id ); ?>">
+			<input type="hidden" name="do" value="<?php echo esc_attr( $do ); ?>">
+			<?php if ( 'cancel' === $do ) : ?>
+				<label class="scp-inline-check"><input type="checkbox" name="notify_client" value="1" checked> anunță clientul</label>
+			<?php endif; ?>
+			<button class="button <?php echo esc_attr( $cls ); ?>" <?php disabled( $disabled ); ?>><?php echo esc_html( $label ); ?></button>
+		</form>
+		<?php
+	}
+
+	public static function save_booking(): void {
+		if ( ! current_user_can( SCP_Install::CAP ) ) {
+			wp_die( 'Nu ai acces.' );
+		}
+		check_admin_referer( 'scp_save_booking' );
+		$p  = wp_unslash( $_POST );
+		$id = (int) ( $p['id'] ?? 0 );
+
+		$time = ! empty( $p['custom_time'] ) && SCP_Helpers::is_time( $p['custom_time'] ) ? $p['custom_time'] : ( $p['time'] ?? '' );
+		$data = array(
+			'date'           => $p['date'] ?? '',
+			'time'           => $time,
+			'package'        => $p['package'] ?? '',
+			'name'           => $p['name'] ?? '',
+			'email'          => $p['email'] ?? '',
+			'phone'          => $p['phone'] ?? '',
+			'message'        => $p['message'] ?? '',
+			'notes'          => $p['notes'] ?? '',
+			'status'         => $p['status'] ?? 'confirmed',
+			'payment_status' => $p['payment_status'] ?? 'unpaid',
+			'notify_client'  => ! empty( $p['notify_client'] ),
+			'voucher'        => $p['voucher'] ?? '',
+			'require_payment'=> ! empty( $p['require_payment'] ),
+		);
+		if ( isset( $p['price'] ) && '' !== trim( (string) $p['price'] ) ) {
+			$data['price'] = str_replace( array( '.', ',' ), array( '', '.' ), (string) $p['price'] );
+		}
+
+		if ( ! $id ) {
+			$back = admin_url( 'admin.php?page=scp-bookings&new=1&date=' . rawurlencode( (string) $data['date'] ) . '&time=' . rawurlencode( (string) $time ) );
+			if ( empty( $p['send_confirmation'] ) ) {
+				remove_action( 'scp_booking_created', array( 'SCP_Mailer', 'on_created' ), 20 );
+				// Ștefan primește totuși alerta internă.
+				add_action(
+					'scp_booking_created',
+					static function ( $b ) {
+						$admins = SCP_Settings::admin_emails();
+						if ( $admins ) {
+							SCP_Mailer::send_template( 'admin_new', $b, $admins, array( 'admin' => true ) );
+						}
+					},
+					20
+				);
+			}
+			$source = in_array( $p['source'] ?? '', array( 'phone', 'admin' ), true ) ? $p['source'] : 'phone';
+			$b      = SCP_Bookings::create( $data, $source );
+			if ( is_wp_error( $b ) ) {
+				$fields = (array) ( $b->get_error_data()['fields'] ?? array() );
+				self::fail( $b->get_error_message() . ( $fields ? ' ' . implode( ' ', $fields ) : '' ), $back );
+			}
+			// Statusurile alese la creare (de ex. plătită la studio).
+			if ( 'unpaid' !== $data['payment_status'] || 'confirmed' !== $data['status'] || isset( $data['price'] ) ) {
+				SCP_Bookings::update(
+					$b['id'],
+					array_intersect_key( $data, array_flip( array( 'payment_status', 'status', 'price' ) ) )
+				);
+			}
+			wp_safe_redirect( admin_url( 'admin.php?page=scp-bookings&booking=' . $b['id'] . '&scp_msg=created' ) );
+			exit;
+		}
+
+		$b = SCP_Bookings::update( $id, $data );
+		if ( is_wp_error( $b ) ) {
+			self::fail( $b->get_error_message(), admin_url( 'admin.php?page=scp-bookings&booking=' . $id ) );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=scp-bookings&booking=' . $id . '&scp_msg=saved' ) );
+		exit;
+	}
+
+	public static function booking_action(): void {
+		if ( ! current_user_can( SCP_Install::CAP ) ) {
+			wp_die( 'Nu ai acces.' );
+		}
+		$id = (int) ( $_POST['id'] ?? 0 ); // phpcs:ignore
+		check_admin_referer( 'scp_booking_action_' . $id );
+		$do   = sanitize_key( wp_unslash( $_POST['do'] ?? '' ) );
+		$back = admin_url( 'admin.php?page=scp-bookings&booking=' . $id );
+		$b    = SCP_Bookings::get( $id );
+		if ( ! $b ) {
+			self::fail( 'Programarea nu există.', admin_url( 'admin.php?page=scp-bookings' ) );
+		}
+
+		switch ( $do ) {
+			case 'payment_link':
+				$res = SCP_Mailer::send_payment_link( $b );
+				if ( is_wp_error( $res ) ) {
+					self::fail( $res->get_error_message(), $back );
+				}
+				$after = SCP_Bookings::mark_link_sent( $id );
+				do_action( 'scp_payment_link_sent', $after );
+				$msg = 'link_sent';
+				break;
+			case 'extend':
+				$base = $b['pay_by'] && $b['pay_by'] > SCP_Helpers::mysql_now() ? new DateTimeImmutable( $b['pay_by'], SCP_Helpers::tz() ) : SCP_Helpers::now();
+				$res  = SCP_Bookings::update( $id, array( 'pay_by' => $base->modify( '+24 hours' )->format( 'Y-m-d H:i:s' ) ) );
+				if ( is_wp_error( $res ) ) {
+					self::fail( $res->get_error_message(), $back );
+				}
+				$msg = 'saved';
+				break;
+			case 'resend':
+				if ( ! SCP_Mailer::resend_confirmation( $b ) ) {
+					self::fail( 'Emailul nu a putut fi trimis.', $back );
+				}
+				$msg = 'resent';
+				break;
+			case 'cancel':
+				$res = SCP_Bookings::update(
+					$id,
+					array(
+						'status'        => 'cancelled',
+						'notify_client' => ! empty( $_POST['notify_client'] ), // phpcs:ignore
+					)
+				);
+				if ( is_wp_error( $res ) ) {
+					self::fail( $res->get_error_message(), $back );
+				}
+				$msg = 'cancelled';
+				break;
+			default:
+				$msg = '';
+		}
+		wp_safe_redirect( add_query_arg( 'scp_msg', $msg, $back ) );
+		exit;
+	}
+
+	public static function export_csv(): void {
+		if ( ! current_user_can( SCP_Install::CAP ) ) {
+			wp_die( 'Nu ai acces.' );
+		}
+		check_admin_referer( 'scp_export' );
+		$f             = self::filters_from_request();
+		$f['per_page'] = 1000;
+		$f['page']     = 1;
+		if ( 'all' === $f['status'] ) {
+			$f['status'] = '';
+		}
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="programari-craciun-' . SCP_Helpers::now()->format( 'Y-m-d-His' ) . '.csv"' );
+		$out = fopen( 'php://output', 'w' );
+		fwrite( $out, "\xEF\xBB\xBF" ); // BOM, ca Excel să citească diacriticele.
+		fputcsv( $out, array( 'Cod', 'Data programarii', 'Ziua', 'Ora', 'Nume', 'Telefon', 'Email', 'Pachet', 'Pret', 'Status programare', 'Status plata', 'Sursa', 'Mesaj', 'Observatii', 'Intrata la' ), ';' );
+		do {
+			$q = SCP_Bookings::query( $f );
+			foreach ( $q['items'] as $b ) {
+				$e = SCP_Bookings::export( $b );
+				fputcsv(
+					$out,
+					array( $e['code'], $e['date_ro'], $e['weekday_ro'], $e['time'], $e['name'], $e['phone'], $e['email'], $e['package_label'], SCP_Helpers::money( $e['price'] ), $e['status_label'], $e['payment_status_label'], $e['source_label'], $e['message'], $e['notes'], $e['created_date_ro'] . ' ' . $e['created_time_ro'] ),
+					';'
+				);
+			}
+			++$f['page'];
+		} while ( count( $q['items'] ) === $f['per_page'] );
+		fclose( $out );
+		exit;
+	}
+
+	/* =========================================================
+	 * Calendar
+	 * ======================================================= */
+
+	public static function page_calendar(): void {
+		$actions = '<a class="button" href="' . esc_url( admin_url( 'admin.php?page=scp-settings#program' ) ) . '">Program standard</a>';
+		self::header( 'Calendar și blocări', $actions );
+		?>
+		<p class="scp-lead">Apasă pe o oră liberă ca s-o blochezi sau să adaugi o programare. Apasă pe o oră blocată ca s-o deschizi din nou. Programul standard (zile și ore) se schimbă din Setări.</p>
+		<div id="scp-calendar" class="scp-cal-admin">
+			<div class="scp-cal-toolbar">
+				<button type="button" class="button" data-nav="-1" aria-label="Luna anterioară">‹</button>
+				<strong class="scp-cal-title"></strong>
+				<button type="button" class="button" data-nav="1" aria-label="Luna următoare">›</button>
+				<label class="scp-cal-toggle"><input type="checkbox" data-hide-closed checked> ascunde zilele fără program</label>
+				<span class="scp-cal-legend">
+					<span class="scp-lg scp-lg--free">liber</span>
+					<span class="scp-lg scp-lg--booked">programat</span>
+					<span class="scp-lg scp-lg--blocked">blocat</span>
+					<span class="scp-lg scp-lg--past">trecut</span>
+				</span>
+			</div>
+			<div class="scp-cal-body"><p class="scp-empty scp-empty--pad">Se încarcă…</p></div>
+		</div>
+		<?php
+		self::footer();
+	}
+
+	/* =========================================================
+	 * Setări
+	 * ======================================================= */
+
+	public static function page_settings(): void {
+		$s        = SCP_Settings::all();
+		$packages = array_values( SCP_Settings::packages() );
+		$times    = SCP_Settings::times();
+		$grid     = array();
+		for ( $h = 7; $h <= 21; $h++ ) {
+			$grid[] = sprintf( '%02d:00', $h );
+		}
+		$other_times = array_diff( $times, $grid );
+
+		self::header( 'Setări programări' );
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-settings">
+			<?php wp_nonce_field( 'scp_save_settings' ); ?>
+			<input type="hidden" name="action" value="scp_save_settings">
+
+			<nav class="scp-tabs">
+				<a href="#program">Program</a><a href="#pachete">Pachete</a><a href="#studio">Studio</a><a href="#emailuri">Emailuri</a><a href="#plata">Plată</a><a href="#webhook">Webhook n8n</a>
+			</nav>
+
+			<section class="scp-panel" id="program">
+				<h2>Program</h2>
+				<table class="form-table" role="presentation">
+					<tr><th>Programări online</th><td>
+						<label class="scp-switch"><input type="checkbox" name="booking_open" value="1" <?php checked( ! empty( $s['booking_open'] ) ); ?>> <span>Deschise pe site</span></label>
+						<p class="description">Când sunt închise, clienții văd mesajul de mai jos în locul calendarului. Din admin poți adăuga programări oricând.</p>
+					</td></tr>
+					<tr><th><label for="closed_message">Mesaj când sunt închise</label></th><td><input type="text" class="large-text" name="closed_message" id="closed_message" value="<?php echo esc_attr( $s['closed_message'] ); ?>"></td></tr>
+					<tr><th>Perioada ședințelor</th><td>
+						<label>de la <input type="date" name="start_date" value="<?php echo esc_attr( $s['start_date'] ); ?>"></label>
+						<label>până la <input type="date" name="end_date" value="<?php echo esc_attr( $s['end_date'] ); ?>"></label>
+					</td></tr>
+					<tr><th>Zile lucrătoare</th><td class="scp-checkrow">
+						<?php foreach ( SCP_Helpers::WEEKDAYS as $n => $label ) : ?>
+							<label><input type="checkbox" name="weekdays[]" value="<?php echo esc_attr( (string) $n ); ?>" <?php checked( in_array( $n, array_map( 'intval', (array) $s['weekdays'] ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
+						<?php endforeach; ?>
+					</td></tr>
+					<tr><th>Ore de început</th><td>
+						<div class="scp-hours">
+							<?php foreach ( $grid as $t ) : ?>
+								<label><input type="checkbox" name="times[]" value="<?php echo esc_attr( $t ); ?>" <?php checked( in_array( $t, $times, true ) ); ?>><span><?php echo esc_html( $t ); ?></span></label>
+							<?php endforeach; ?>
+						</div>
+						<p><label>Alte ore <input type="text" name="times_other" value="<?php echo esc_attr( implode( ', ', $other_times ) ); ?>" placeholder="ex. 10:30, 16:30" class="regular-text"></label></p>
+						<p class="description">Acestea sunt orele din fiecare zi lucrătoare. Pentru o singură zi, blochezi sau adaugi ore din <a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-calendar' ) ); ?>">Calendar</a>.</p>
+					</td></tr>
+					<tr><th><label for="session_minutes">Durata ședinței</label></th><td><input type="number" min="15" max="240" step="5" name="session_minutes" id="session_minutes" value="<?php echo esc_attr( (string) $s['session_minutes'] ); ?>" class="small-text"> minute <p class="description">Apare în confirmare și în calendarul clientului. Nu schimbă orele de început.</p></td></tr>
+					<tr><th><label for="min_notice_hours">Programare cu cel puțin</label></th><td><input type="number" min="0" max="336" name="min_notice_hours" id="min_notice_hours" value="<?php echo esc_attr( (string) $s['min_notice_hours'] ); ?>" class="small-text"> ore înainte <p class="description">0 = se poate rezerva până în ultimul moment. Nu se aplică programărilor adăugate din admin.</p></td></tr>
+					<tr><th><label for="target">Obiectiv sezon</label></th><td><input type="number" min="0" name="target" id="target" value="<?php echo esc_attr( (string) $s['target'] ); ?>" class="small-text"> programări</td></tr>
+				</table>
+			</section>
+
+			<section class="scp-panel" id="pachete">
+				<h2>Pachete</h2>
+				<p class="description">Câte o caracteristică pe rând. Prețul se copiază în programare în momentul rezervării; dacă îl schimbi aici, programările existente rămân cu prețul lor.</p>
+				<div class="scp-packages-edit">
+					<?php foreach ( array_merge( $packages, array( array( 'key' => '', 'label' => '', 'price' => '', 'desc' => '' ) ) ) as $i => $p ) : ?>
+						<div class="scp-pkg-edit<?php echo '' === $p['key'] ? ' is-new' : ''; ?>">
+							<label><span>Nume</span><input type="text" name="packages[<?php echo (int) $i; ?>][label]" value="<?php echo esc_attr( $p['label'] ); ?>" placeholder="<?php echo '' === $p['key'] ? 'Pachet nou (opțional)' : ''; ?>"></label>
+							<label><span>Preț (lei)</span><input type="number" min="0" step="1" name="packages[<?php echo (int) $i; ?>][price]" value="<?php echo esc_attr( (string) $p['price'] ); ?>"></label>
+							<label class="scp-wide"><span>Ce include</span><textarea rows="3" name="packages[<?php echo (int) $i; ?>][desc]"><?php echo esc_textarea( $p['desc'] ); ?></textarea></label>
+							<input type="hidden" name="packages[<?php echo (int) $i; ?>][key]" value="<?php echo esc_attr( $p['key'] ); ?>">
+							<?php if ( '' !== $p['key'] ) : ?>
+								<label class="scp-inline-check"><input type="checkbox" name="packages[<?php echo (int) $i; ?>][remove]" value="1"> scoate pachetul din formular</label>
+							<?php endif; ?>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			</section>
+
+			<section class="scp-panel" id="studio">
+				<h2>Studio</h2>
+				<table class="form-table" role="presentation">
+					<tr><th><label for="studio_name">Nume</label></th><td><input type="text" class="regular-text" name="studio_name" id="studio_name" value="<?php echo esc_attr( $s['studio_name'] ); ?>"></td></tr>
+					<tr><th><label for="studio_address">Adresă</label></th><td><input type="text" class="large-text" name="studio_address" id="studio_address" value="<?php echo esc_attr( $s['studio_address'] ); ?>"></td></tr>
+					<tr><th><label for="studio_phone">Telefon</label></th><td><input type="text" class="regular-text" name="studio_phone" id="studio_phone" value="<?php echo esc_attr( $s['studio_phone'] ); ?>"></td></tr>
+					<tr><th><label for="terms_url">Pagina de termeni</label></th><td><input type="text" class="regular-text" name="terms_url" id="terms_url" value="<?php echo esc_attr( $s['terms_url'] ); ?>"></td></tr>
+				</table>
+			</section>
+
+			<section class="scp-panel" id="emailuri">
+				<h2>Emailuri</h2>
+				<p class="description">Emailurile pleacă prin funcția de email a site-ului, deci prin Postmark, așa cum e configurat în FluentSMTP. Lasă expeditorul gol ca să folosești setarea din FluentSMTP.</p>
+				<table class="form-table" role="presentation">
+					<tr><th><label for="admin_emails">Notificări programări noi</label></th><td><input type="text" class="large-text" name="admin_emails" id="admin_emails" value="<?php echo esc_attr( $s['admin_emails'] ); ?>"><p class="description">Una sau mai multe adrese, separate prin virgulă.</p></td></tr>
+					<tr><th><label for="from_name">Nume expeditor</label></th><td><input type="text" class="regular-text" name="from_name" id="from_name" value="<?php echo esc_attr( $s['from_name'] ); ?>"></td></tr>
+					<tr><th><label for="from_email">Email expeditor</label></th><td><input type="email" class="regular-text" name="from_email" id="from_email" value="<?php echo esc_attr( $s['from_email'] ); ?>"><p class="description">Trebuie să fie pe un domeniu verificat în Postmark.</p></td></tr>
+					<tr><th><label for="reply_to">Răspunsurile clienților la</label></th><td><input type="email" class="regular-text" name="reply_to" id="reply_to" value="<?php echo esc_attr( $s['reply_to'] ); ?>"></td></tr>
+				</table>
+				<p class="scp-placeholders">În subiect și text poți folosi: <code>{nume}</code> <code>{data}</code> <code>{ziua}</code> <code>{data_lunga}</code> <code>{ora}</code> <code>{pachet}</code> <code>{pret}</code> <code>{cod}</code> <code>{telefon}</code> <code>{email}</code> <code>{mesaj}</code> <code>{studio}</code> <code>{adresa}</code> <code>{telefon_studio}</code> <code>{link_plata}</code> <code>{termen_plata}</code> <code>{pret_intreg}</code> <code>{reducere}</code>. Detaliile ședinței (dată, oră, pachet, adresă, cod) apar automat sub text.</p>
+				<?php
+				$titles = array(
+					'client_pending'      => 'Rezervare de pe site, cu link de plată',
+					'payment_received'    => 'Plată primită, programare confirmată',
+					'payment_reminder'    => 'Reamintire plată',
+					'session_reminder_day'  => 'Reamintire ședință cu o zi înainte (rezervă pentru SMS)',
+					'session_reminder_hour' => 'Reamintire ședință cu o oră înainte (rezervă pentru SMS)',
+					'expired'             => 'Rezervare anulată automat (neplătită)',
+					'client_confirmation' => 'Confirmare fără plată online (programări din admin)',
+					'admin_new'           => 'Alertă programare nouă (către voi)',
+					'payment_link'        => 'Link de plată trimis manual',
+					'rescheduled'         => 'Programare mutată',
+					'cancelled'           => 'Programare anulată',
+				);
+				foreach ( $titles as $key => $title ) :
+					$e = $s['emails'][ $key ];
+					?>
+					<details class="scp-mail" <?php echo 'client_pending' === $key ? 'open' : ''; ?>>
+						<summary><strong><?php echo esc_html( $title ); ?></strong> <?php echo empty( $e['enabled'] ) ? '<span class="scp-badge">oprit</span>' : ''; ?></summary>
+						<label class="scp-inline-check"><input type="checkbox" name="emails[<?php echo esc_attr( $key ); ?>][enabled]" value="1" <?php checked( ! empty( $e['enabled'] ) ); ?>> Trimite acest email<?php echo 'payment_link' === $key ? ' (se trimite doar când apeși butonul din fișa programării)' : ''; ?></label>
+						<label><span>Subiect</span><input type="text" class="large-text" name="emails[<?php echo esc_attr( $key ); ?>][subject]" value="<?php echo esc_attr( $e['subject'] ); ?>"></label>
+						<label><span>Text</span><textarea class="large-text" rows="9" name="emails[<?php echo esc_attr( $key ); ?>][body]"><?php echo esc_textarea( $e['body'] ); ?></textarea></label>
+					</details>
+				<?php endforeach; ?>
+			</section>
+
+			<section class="scp-panel" id="plata">
+				<h2>Plată și reduceri</h2>
+				<?php
+				$variations = self::wc_variation_options();
+				$map        = (array) $s['wc_variations'];
+				?>
+				<table class="form-table" role="presentation">
+					<tr><th><label for="payment_url">Pagina de plată</label></th><td>
+						<input type="text" class="large-text" name="payment_url" id="payment_url" value="<?php echo esc_attr( $s['payment_url'] ); ?>">
+						<p class="description">Adresa pasului de checkout din CartFlows. Păstrează <code>?scp={token}</code> la final: așa pagina de plată recunoaște programarea, pune în coș exact pachetul și reducerea ei și precompletează datele clientului. După plată, programarea devine „Confirmată” și „Plătită online”.</p>
+					</td></tr>
+					<tr><th>Produsul pentru fiecare pachet</th><td>
+						<?php if ( ! $variations ) : ?>
+							<p>WooCommerce nu e activ sau nu există produse.</p>
+						<?php else : ?>
+							<?php foreach ( SCP_Settings::packages() as $k => $p ) : ?>
+								<p><label><span class="scp-map-label"><?php echo esc_html( $p['label'] ); ?></span>
+									<select name="wc_variations[<?php echo esc_attr( $k ); ?>]">
+										<option value="0">— alege produsul —</option>
+										<?php foreach ( $variations as $vid => $vlabel ) : ?>
+											<option value="<?php echo esc_attr( (string) $vid ); ?>" <?php selected( (int) ( $map[ $k ] ?? 0 ), $vid ); ?>><?php echo esc_html( $vlabel ); ?></option>
+										<?php endforeach; ?>
+									</select></label></p>
+							<?php endforeach; ?>
+							<p class="description">Prețul din WooCommerce trebuie să fie același cu cel al pachetului de aici; reducerile se aplică separat, ca reducere pe comandă.</p>
+						<?php endif; ?>
+					</td></tr>
+					<tr><th><label for="pay_hours">Termen de plată</label></th><td>
+						<input type="number" min="0" max="336" name="pay_hours" id="pay_hours" value="<?php echo esc_attr( (string) $s['pay_hours'] ); ?>" class="small-text"> ore de la rezervare
+						<p class="description">Rezervările de pe site au statusul „Așteaptă plata” și se anulează automat dacă plata nu ajunge în acest termen. 0 = fără termen (rezervările sunt confirmate direct). Dacă ședința are loc înainte de expirarea termenului, rezervarea nu se mai anulează automat: clientul primește linkul de plată și poate plăti online sau la studio.</p>
+					</td></tr>
+					<tr><th><label for="pay_reminder_hours">Reamintire</label></th><td><input type="number" min="0" max="168" name="pay_reminder_hours" id="pay_reminder_hours" value="<?php echo esc_attr( (string) $s['pay_reminder_hours'] ); ?>" class="small-text"> ore înainte de expirare <p class="description">0 = fără email de reamintire.</p></td></tr>
+					<tr><th>Reducere de început de sezon</th><td>
+						<p><label><input type="checkbox" name="early_enabled" value="1" <?php checked( ! empty( $s['early_enabled'] ) ); ?>> Activă</label></p>
+						<p><label><input type="number" min="0" step="1" name="early_amount" value="<?php echo esc_attr( (string) $s['early_amount'] ); ?>" class="small-text"> lei reducere</label>
+						pentru rezervările făcute până pe <input type="date" name="early_until" value="<?php echo esc_attr( $s['early_until'] ); ?>"> inclusiv, la pachetele:</p>
+						<p class="scp-checkrow">
+							<?php foreach ( SCP_Settings::packages() as $k => $p ) : ?>
+								<label><input type="checkbox" name="early_packages[]" value="<?php echo esc_attr( $k ); ?>" <?php checked( in_array( $k, (array) $s['early_packages'], true ) ); ?>> <?php echo esc_html( $p['label'] ); ?></label>
+							<?php endforeach; ?>
+						</p>
+						<p><label>Textul afișat clienților <input type="text" class="large-text" name="early_label" value="<?php echo esc_attr( $s['early_label'] ); ?>"></label></p>
+						<p><label>Cuponul WooCommerce folosit <input type="text" class="regular-text scp-mono" name="early_coupon" value="<?php echo esc_attr( $s['early_coupon'] ); ?>"></label></p>
+						<p class="description">La salvare, pluginul creează sau actualizează cuponul cu suma și pachetele de mai sus. Cuponul se aplică automat doar programărilor care au dreptul la reducere; dacă cineva îl scrie manual pe pagina de plată, nu e acceptat. Prețul redus rămâne valabil cât timp programarea e plătită în termen, chiar dacă plata vine după data limită.</p>
+					</td></tr>
+					<tr><th>Vouchere cadou</th><td>
+						<label><input type="checkbox" name="vouchers_enabled" value="1" <?php checked( ! empty( $s['vouchers_enabled'] ) ); ?>> Clienții pot folosi un voucher cadou în formular</label>
+						<p class="description">Voucherul se cumpără ca produs WooCommerce. După plata comenzii, pluginul generează câte un cod pentru fiecare voucher cumpărat și îl trimite cumpărătorului pe email. Codul acoperă integral ședința, doar pentru pachetul cumpărat, o singură dată, până la finalul sezonului.</p>
+						<?php if ( $variations ) : ?>
+							<?php $vmap = (array) $s['voucher_products']; ?>
+							<?php foreach ( SCP_Settings::packages() as $k => $p ) : ?>
+								<p><label><span class="scp-map-label">Voucher <?php echo esc_html( $p['label'] ); ?></span>
+									<select name="voucher_products[<?php echo esc_attr( $k ); ?>]">
+										<option value="0">— alege produsul voucher —</option>
+										<?php foreach ( $variations as $vid => $vlabel ) : ?>
+											<option value="<?php echo esc_attr( (string) $vid ); ?>" <?php selected( (int) ( $vmap[ $k ] ?? 0 ), $vid ); ?>><?php echo esc_html( $vlabel ); ?></option>
+										<?php endforeach; ?>
+									</select></label></p>
+							<?php endforeach; ?>
+							<p><label><span class="scp-map-label">Pagina de cumpărare</span> <input type="text" class="regular-text" name="voucher_url" value="<?php echo esc_attr( (string) ( $s['voucher_url'] ?? '' ) ); ?>"></label></p>
+							<p class="description">Pasul de checkout CartFlows pentru vouchere. Linkurile <code><?php echo esc_html( strtok( (string) ( $s['voucher_url'] ?? '' ), '?' ) ); ?>?pachet=foto</code> și <code>?pachet=foto_plus</code> pun direct în coș voucherul pachetului respectiv, fără să mai treacă prin pagina produsului.</p>
+							<p><label><span class="scp-map-label">Începutul codului</span> <input type="text" class="small-text scp-mono" style="width:9em" maxlength="10" name="voucher_prefix" value="<?php echo esc_attr( (string) ( $s['voucher_prefix'] ?? 'CHELMU' ) ); ?>"></label></p>
+							<p class="description">Codurile arată așa: <code><?php echo esc_html( ( $s['voucher_prefix'] ?? 'CHELMU' ) ?: 'CHELMU' ); ?>-BRAD-K7MP9Q</code>, cu un cuvânt de Crăciun ales la întâmplare (<?php echo esc_html( strtolower( implode( ', ', SCP_Vouchers::CODE_WORDS ) ) ); ?>) și 6 caractere unice. În formular se pot scrie și cu litere mici sau fără cratime.</p>
+							<p><label><input type="checkbox" name="create_voucher_product" value="1"> Creează acum produsul „Voucher ședință foto de Crăciun”, cu câte o variantă pentru fiecare pachet, la prețul întreg, și leagă-l aici</label></p>
+						<?php endif; ?>
+					</td></tr>
+				</table>
+			</section>
+
+			<section class="scp-panel" id="webhook">
+				<h2>Webhook n8n</h2>
+				<table class="form-table" role="presentation">
+					<tr><th><label for="webhook_url">Adresa webhook</label></th><td><input type="url" class="large-text" name="webhook_url" id="webhook_url" value="<?php echo esc_attr( $s['webhook_url'] ); ?>" placeholder="https://n8n.exemplu.ro/webhook/..."></td></tr>
+					<tr><th><label for="webhook_secret">Cheie secretă</label></th><td>
+						<div class="scp-copy"><input type="text" name="webhook_secret" id="webhook_secret" value="<?php echo esc_attr( $s['webhook_secret'] ); ?>" class="regular-text scp-mono"><button type="button" class="button" data-copy="#webhook_secret">Copiază</button><button type="button" class="button" data-regenerate="#webhook_secret">Generează alta</button></div>
+						<p class="description">Fiecare trimitere are antetul <code>X-SCP-Signature</code> = HMAC-SHA256(cheie, <code>X-SCP-Timestamp</code> + "." + corpul cererii). În n8n poți verifica semnătura ca să accepți doar date venite de pe site.</p>
+					</td></tr>
+					<tr><th>Evenimente</th><td class="scp-checkcol">
+						<?php
+						$events = array(
+							'booking.created'           => 'Programare nouă',
+							'booking.updated'           => 'Programare modificată (dată, status, plată, observații)',
+							'booking.cancelled'         => 'Programare anulată',
+							'booking.payment_link_sent' => 'Link de plată trimis',
+							'booking.paid'              => 'Plată înregistrată',
+							'voucher.issued'            => 'Voucher cadou emis (după plata comenzii)',
+						);
+						foreach ( $events as $k => $l ) :
+							?>
+							<label><input type="checkbox" name="webhook_events[]" value="<?php echo esc_attr( $k ); ?>" <?php checked( in_array( $k, (array) $s['webhook_events'], true ) ); ?>> <?php echo esc_html( $l ); ?> <code><?php echo esc_html( $k ); ?></code></label>
+						<?php endforeach; ?>
+					</td></tr>
+					<tr><th>Test</th><td><button type="button" class="button" id="scp-webhook-test">Trimite un eveniment de test</button> <span id="scp-webhook-result" aria-live="polite"></span><p class="description">Salvează setările înainte de test. Evenimentul de test are <code>"event": "test"</code> și codul <code>TEST00</code>, ca să-l poți filtra în n8n.</p></td></tr>
+					<tr><th>Măsurare</th><td><label><input type="checkbox" name="track_fbq" value="1" <?php checked( ! empty( $s['track_fbq'] ) ); ?>> Trimite și evenimentul Meta Pixel <code>Schedule</code> la programare</label><p class="description">Evenimentul <code>scp_booking</code> ajunge mereu în dataLayer, pentru GTM. Bifează doar dacă nu trimiți deja conversia către Meta din GTM, ca să nu se numere de două ori.</p></td></tr>
+				</table>
+			</section>
+
+			<p class="submit scp-sticky-submit"><button class="button button-primary button-large">Salvează setările</button></p>
+		</form>
+		<?php
+		self::footer();
+	}
+
+	public static function save_settings(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Nu ai acces.' );
+		}
+		check_admin_referer( 'scp_save_settings' );
+		$p    = wp_unslash( $_POST );
+		$back = admin_url( 'admin.php?page=scp-settings' );
+
+		$start = sanitize_text_field( $p['start_date'] ?? '' );
+		$end   = sanitize_text_field( $p['end_date'] ?? '' );
+		if ( ! SCP_Helpers::is_date( $start ) || ! SCP_Helpers::is_date( $end ) || $end < $start ) {
+			self::fail( 'Perioada nu e validă: data de final trebuie să fie după data de început.', $back );
+		}
+
+		$times = array_filter( (array) ( $p['times'] ?? array() ), array( 'SCP_Helpers', 'is_time' ) );
+		foreach ( preg_split( '/[\s,;]+/', (string) ( $p['times_other'] ?? '' ) ) as $t ) {
+			$t = trim( $t );
+			if ( preg_match( '/^(\d{1,2})[:.](\d{2})$/', $t, $m ) ) {
+				$t = sprintf( '%02d:%02d', (int) $m[1], (int) $m[2] );
+			}
+			if ( SCP_Helpers::is_time( $t ) ) {
+				$times[] = $t;
+			}
+		}
+		$times = array_values( array_unique( $times ) );
+		sort( $times );
+
+		$packages = array();
+		$used     = array();
+		foreach ( (array) ( $p['packages'] ?? array() ) as $row ) {
+			$label = sanitize_text_field( $row['label'] ?? '' );
+			if ( '' === $label || ! empty( $row['remove'] ) ) {
+				continue;
+			}
+			$key = sanitize_key( $row['key'] ?? '' );
+			if ( '' === $key ) {
+				$key = sanitize_key( str_replace( '-', '_', sanitize_title( remove_accents( $label ) ) ) ) ?: 'pachet';
+			}
+			$base = $key;
+			$n    = 2;
+			while ( isset( $used[ $key ] ) ) {
+				$key = $base . '_' . $n++;
+			}
+			$used[ $key ] = true;
+			$packages[]   = array(
+				'key'   => $key,
+				'label' => $label,
+				'price' => max( 0, (float) ( $row['price'] ?? 0 ) ),
+				'desc'  => sanitize_textarea_field( $row['desc'] ?? '' ),
+			);
+		}
+		if ( ! $packages ) {
+			self::fail( 'Formularul are nevoie de cel puțin un pachet.', $back . '#pachete' );
+		}
+
+		$emails = array();
+		foreach ( SCP_Settings::default_emails() as $key => $def ) {
+			$in             = (array) ( $p['emails'][ $key ] ?? array() );
+			$emails[ $key ] = array(
+				'enabled' => empty( $in['enabled'] ) ? 0 : 1,
+				'subject' => sanitize_text_field( $in['subject'] ?? $def['subject'] ),
+				'body'    => sanitize_textarea_field( $in['body'] ?? $def['body'] ),
+			);
+		}
+
+		$allowed_events = array( 'booking.created', 'booking.updated', 'booking.cancelled', 'booking.payment_link_sent', 'booking.paid', 'voucher.issued' );
+		$secret         = sanitize_text_field( $p['webhook_secret'] ?? '' );
+
+		SCP_Settings::update(
+			array(
+				'booking_open'     => empty( $p['booking_open'] ) ? 0 : 1,
+				'closed_message'   => sanitize_text_field( $p['closed_message'] ?? '' ),
+				'start_date'       => $start,
+				'end_date'         => $end,
+				'weekdays'         => array_values( array_intersect( array( 1, 2, 3, 4, 5, 6, 7 ), array_map( 'intval', (array) ( $p['weekdays'] ?? array() ) ) ) ),
+				'times'            => $times,
+				'session_minutes'  => max( 15, min( 240, (int) ( $p['session_minutes'] ?? 60 ) ) ),
+				'min_notice_hours' => max( 0, min( 336, (int) ( $p['min_notice_hours'] ?? 0 ) ) ),
+				'target'           => max( 0, (int) ( $p['target'] ?? 0 ) ),
+				'packages'         => $packages,
+				'studio_name'      => sanitize_text_field( $p['studio_name'] ?? '' ),
+				'studio_address'   => sanitize_text_field( $p['studio_address'] ?? '' ),
+				'studio_phone'     => sanitize_text_field( $p['studio_phone'] ?? '' ),
+				'terms_url'        => sanitize_text_field( $p['terms_url'] ?? '' ),
+				'admin_emails'     => implode( ', ', array_filter( array_map( 'sanitize_email', preg_split( '/[\s,;]+/', (string) ( $p['admin_emails'] ?? '' ) ) ), 'is_email' ) ),
+				'from_name'        => sanitize_text_field( $p['from_name'] ?? '' ),
+				'from_email'       => sanitize_email( $p['from_email'] ?? '' ),
+				'reply_to'         => sanitize_email( $p['reply_to'] ?? '' ),
+				'payment_url'      => sanitize_text_field( $p['payment_url'] ?? '' ),
+				'webhook_url'      => esc_url_raw( trim( (string) ( $p['webhook_url'] ?? '' ) ) ),
+				'webhook_secret'   => strlen( $secret ) >= 16 ? $secret : wp_generate_password( 40, false, false ),
+				'webhook_events'   => array_values( array_intersect( $allowed_events, (array) ( $p['webhook_events'] ?? array() ) ) ),
+				'track_fbq'        => empty( $p['track_fbq'] ) ? 0 : 1,
+				'pay_hours'                => max( 0, min( 336, (int) ( $p['pay_hours'] ?? 48 ) ) ),
+				'pay_reminder_hours'       => max( 0, min( 168, (int) ( $p['pay_reminder_hours'] ?? 12 ) ) ),
+				'early_enabled'            => empty( $p['early_enabled'] ) ? 0 : 1,
+				'early_until'              => SCP_Helpers::is_date( (string) ( $p['early_until'] ?? '' ) ) ? $p['early_until'] : '',
+				'early_amount'             => max( 0, (float) ( $p['early_amount'] ?? 0 ) ),
+				'early_packages'           => array_values( array_intersect( array_column( $packages, 'key' ), (array) ( $p['early_packages'] ?? array() ) ) ),
+				'early_label'              => sanitize_text_field( $p['early_label'] ?? '' ),
+				'early_coupon'             => sanitize_text_field( $p['early_coupon'] ?? '' ),
+				'vouchers_enabled'         => empty( $p['vouchers_enabled'] ) ? 0 : 1,
+				'voucher_url'              => sanitize_text_field( $p['voucher_url'] ?? '' ),
+				'voucher_prefix'           => substr( strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) ( $p['voucher_prefix'] ?? '' ) ) ), 0, 10 ) ?: 'CHELMU',
+				'voucher_products'         => array_map( 'intval', array_intersect_key( (array) ( $p['voucher_products'] ?? array() ), array_flip( array_column( $packages, 'key' ) ) ) ),
+				'wc_variations'            => array_map( 'intval', array_intersect_key( (array) ( $p['wc_variations'] ?? array() ), array_flip( array_column( $packages, 'key' ) ) ) ),
+				'emails'           => $emails,
+			)
+		);
+
+		if ( ! empty( $p['create_voucher_product'] ) ) {
+			$made = self::create_voucher_product();
+			if ( is_string( $made ) ) {
+				self::fail( 'Setările au fost salvate, dar produsul voucher nu a putut fi creat: ' . $made, $back . '#plata' );
+			}
+		}
+		$err = SCP_Pricing::sync_early_coupon();
+		if ( $err ) {
+			self::fail( 'Setările au fost salvate, dar cuponul de reducere nu a putut fi actualizat: ' . $err, $back . '#plata' );
+		}
+		wp_safe_redirect( add_query_arg( 'scp_msg', 'settings', $back ) );
+		exit;
+	}
+
+	/** Creează produsul variabil pentru vouchere și îl leagă de pachete. */
+	public static function create_voucher_product() {
+		if ( ! class_exists( 'WC_Product_Variable' ) ) {
+			return 'WooCommerce nu e activ.';
+		}
+		$packages = SCP_Settings::packages();
+		$attr     = new WC_Product_Attribute();
+		$attr->set_name( 'Pachet' );
+		$attr->set_options( array_values( array_column( $packages, 'label' ) ) );
+		$attr->set_visible( true );
+		$attr->set_variation( true );
+
+		$product = new WC_Product_Variable();
+		$product->set_name( 'Voucher ședință foto de Crăciun ' . substr( (string) SCP_Settings::get( 'end_date' ), 0, 4 ) );
+		$product->set_status( 'publish' );
+		$product->set_catalog_visibility( 'visible' );
+		$product->set_virtual( true );
+		$product->set_sold_individually( false );
+		$product->set_short_description( 'Un cadou pentru cei dragi: o ședință foto de Crăciun în studio. După plată primești pe email codul voucherului, pe care îl oferi mai departe; cel care îl primește își alege singur ziua și ora.' );
+		$product->set_attributes( array( $attr ) );
+		$pid = $product->save();
+
+		$map = array();
+		foreach ( $packages as $k => $p ) {
+			$v = new WC_Product_Variation();
+			$v->set_parent_id( $pid );
+			$v->set_attributes( array( 'pachet' => $p['label'] ) );
+			$v->set_regular_price( (string) $p['price'] );
+			$v->set_virtual( true );
+			$v->set_status( 'publish' );
+			$map[ $k ] = $v->save();
+		}
+		WC_Product_Variable::sync( $pid );
+		SCP_Settings::update( array( 'voucher_products' => $map ) );
+		return $pid;
+	}
+
+	/** Variațiile și produsele simple din WooCommerce, pentru legarea pachetelor. */
+	private static function wc_variation_options(): array {
+		if ( ! function_exists( 'wc_get_products' ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( wc_get_products( array( 'limit' => 200, 'status' => 'publish', 'type' => array( 'variable', 'simple' ), 'orderby' => 'date', 'order' => 'DESC' ) ) as $prod ) {
+			if ( $prod->is_type( 'variable' ) ) {
+				foreach ( $prod->get_children() as $cid ) {
+					$v = wc_get_product( $cid );
+					if ( $v ) {
+						$out[ $cid ] = $v->get_name() . ' – ' . wp_strip_all_tags( wc_price( (float) $v->get_regular_price() ) ) . ' (#' . $cid . ')';
+					}
+				}
+			} elseif ( $prod->is_virtual() ) {
+				$out[ $prod->get_id() ] = $prod->get_name() . ' – ' . wp_strip_all_tags( wc_price( (float) $prod->get_regular_price() ) ) . ' (#' . $prod->get_id() . ')';
+			}
+		}
+		return $out;
+	}
+
+	/* =========================================================
+	 * Vouchere
+	 * ======================================================= */
+
+	public static function page_vouchers(): void {
+		$g      = wp_unslash( $_GET ); // phpcs:ignore
+		$status = isset( $g['status'] ) ? sanitize_key( $g['status'] ) : '';
+		$search = isset( $g['s'] ) ? sanitize_text_field( $g['s'] ) : '';
+		$rows   = SCP_Vouchers::query( array( 'status' => $status, 'search' => $search ) );
+		$counts = SCP_Vouchers::counts();
+		$pk     = SCP_Settings::packages();
+		self::header( 'Vouchere cadou' );
+		if ( ! array_filter( (array) SCP_Settings::get( 'voucher_products' ) ) ) {
+			echo '<div class="notice notice-info inline"><p>Produsul voucher nu e legat încă. <a href="' . esc_url( admin_url( 'admin.php?page=scp-settings#plata' ) ) . '">Leagă-l sau creează-l din Setări</a>.</p></div>';
+		}
+		?>
+		<div class="scp-kpis scp-kpis--3">
+			<div class="scp-kpi"><div class="scp-kpi-label">Valabile</div><div class="scp-kpi-value"><?php echo esc_html( (string) $counts['active'] ); ?></div></div>
+			<div class="scp-kpi"><div class="scp-kpi-label">Folosite</div><div class="scp-kpi-value"><?php echo esc_html( (string) $counts['used'] ); ?></div></div>
+			<div class="scp-kpi"><div class="scp-kpi-label">Anulate</div><div class="scp-kpi-value"><?php echo esc_html( (string) $counts['cancelled'] ); ?></div></div>
+		</div>
+		<div class="scp-grid-2 scp-grid-2--wide">
+			<div>
+				<form class="scp-filters" method="get">
+					<input type="hidden" name="page" value="scp-vouchers">
+					<label><span>Caută</span><input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="cod, cumpărător, email"></label>
+					<label><span>Status</span><select name="status"><option value="">Toate</option>
+						<?php foreach ( SCP_Vouchers::STATUSES as $k => $l ) : ?>
+							<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $status, $k ); ?>><?php echo esc_html( $l ); ?></option>
+						<?php endforeach; ?></select></label>
+					<button class="button">Filtrează</button>
+				</form>
+				<div class="scp-panel scp-panel--flush">
+					<?php if ( ! $rows ) : ?>
+						<p class="scp-empty scp-empty--pad">Niciun voucher încă.</p>
+					<?php else : ?>
+						<table class="scp-table"><thead><tr><th>Cod</th><th>Pachet</th><th>Cumpărător</th><th>Status</th><th>Valabil până</th><th></th></tr></thead><tbody>
+						<?php foreach ( $rows as $v ) : ?>
+							<tr>
+								<td><strong class="scp-mono"><?php echo esc_html( $v['code'] ); ?></strong><small><?php echo esc_html( ( new DateTimeImmutable( $v['created_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y' ) . ( $v['note'] ? ' · ' . $v['note'] : '' ) ); ?></small></td>
+								<td><?php echo esc_html( $pk[ $v['package'] ]['label'] ?? $v['package'] ); ?><small><?php echo esc_html( SCP_Helpers::money( $v['value'] ) ); ?> lei</small></td>
+								<td><?php echo esc_html( $v['buyer_name'] ?: '–' ); ?><small><?php echo esc_html( $v['buyer_email'] ); ?><?php if ( $v['order_id'] ) : ?> · <a href="<?php echo esc_url( admin_url( 'post.php?post=' . (int) $v['order_id'] . '&action=edit' ) ); ?>">comanda #<?php echo (int) $v['order_id']; ?></a><?php endif; ?></small></td>
+								<td><span class="scp-badge scp-badge--voucher-<?php echo esc_attr( $v['status'] ); ?>"><?php echo esc_html( SCP_Vouchers::STATUSES[ $v['status'] ] ?? $v['status'] ); ?></span>
+									<?php if ( $v['booking_id'] ) : ?><small><a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&booking=' . (int) $v['booking_id'] ) ); ?>">vezi programarea</a></small><?php endif; ?></td>
+								<td><?php echo esc_html( $v['expires_on'] ? SCP_Helpers::date_ro( $v['expires_on'] ) : '–' ); ?></td>
+								<td class="scp-nowrap">
+									<?php if ( 'used' !== $v['status'] ) : ?>
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-inline-form">
+											<?php wp_nonce_field( 'scp_voucher' ); ?>
+											<input type="hidden" name="action" value="scp_voucher"><input type="hidden" name="id" value="<?php echo (int) $v['id']; ?>">
+											<input type="hidden" name="do" value="<?php echo 'active' === $v['status'] ? 'cancel' : 'activate'; ?>">
+											<?php if ( 'active' === $v['status'] && $v['buyer_email'] ) : ?>
+												<button class="button button-small" name="do" value="resend">Retrimite emailul</button>
+											<?php endif; ?>
+											<button class="button button-small"><?php echo 'active' === $v['status'] ? 'Anulează' : 'Reactivează'; ?></button>
+										</form>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody></table>
+					<?php endif; ?>
+				</div>
+			</div>
+			<form class="scp-panel" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'scp_voucher' ); ?>
+				<input type="hidden" name="action" value="scp_voucher"><input type="hidden" name="do" value="create">
+				<h2>Voucher emis manual</h2>
+				<p class="description">Pentru vouchere vândute la studio sau oferite de voi. Cele cumpărate online se emit singure.</p>
+				<div class="scp-form-grid scp-form-grid--1">
+					<label><span>Pachet</span><select name="package"><?php foreach ( $pk as $k => $p ) : ?><option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $p['label'] . ' – ' . SCP_Helpers::money( $p['price'] ) . ' lei' ); ?></option><?php endforeach; ?></select></label>
+					<label><span>Cumpărător</span><input type="text" name="buyer_name"></label>
+					<label><span>Email cumpărător</span><input type="email" name="buyer_email"><em>Dacă îl completezi, primește codul pe email.</em></label>
+					<label><span>Notă internă</span><input type="text" name="note" placeholder="ex. plătit cash la studio"></label>
+					<label><span>Valabil până</span><input type="date" name="expires_on" value="<?php echo esc_attr( (string) SCP_Settings::get( 'end_date' ) ); ?>"></label>
+				</div>
+				<p><button class="button button-primary">Emite voucherul</button></p>
+			</form>
+		</div>
+		<?php
+		self::footer();
+	}
+
+	public static function voucher_action(): void {
+		if ( ! current_user_can( SCP_Install::CAP ) ) {
+			wp_die( 'Nu ai acces.' );
+		}
+		check_admin_referer( 'scp_voucher' );
+		$p    = wp_unslash( $_POST );
+		$back = admin_url( 'admin.php?page=scp-vouchers' );
+		$do   = sanitize_key( $p['do'] ?? '' );
+		if ( 'create' === $do ) {
+			$v = SCP_Vouchers::create( array_intersect_key( $p, array_flip( array( 'package', 'buyer_name', 'buyer_email', 'note', 'expires_on' ) ) ) );
+			if ( ! $v ) {
+				self::fail( 'Voucherul nu a putut fi creat.', $back );
+			}
+			if ( $v['buyer_email'] ) {
+				SCP_Mailer::send_vouchers( array( $v ), $v['buyer_email'], $v['buyer_name'] );
+			}
+			wp_safe_redirect( add_query_arg( array( 'scp_msg' => 'saved', 's' => $v['code'] ), $back ) );
+			exit;
+		}
+		$id = (int) ( $p['id'] ?? 0 );
+		$v  = SCP_Vouchers::get( $id );
+		if ( ! $v ) {
+			self::fail( 'Voucherul nu există.', $back );
+		}
+		if ( 'resend' === $do ) {
+			SCP_Mailer::send_vouchers( array( $v ), $v['buyer_email'], $v['buyer_name'] );
+		} elseif ( 'cancel' === $do || 'activate' === $do ) {
+			SCP_Vouchers::set_status( $id, 'cancel' === $do ? 'cancelled' : 'active' );
+		}
+		wp_safe_redirect( add_query_arg( 'scp_msg', 'saved', $back ) );
+		exit;
+	}
+
+	/* =========================================================
+	 * Jurnal webhook
+	 * ======================================================= */
+
+	public static function page_webhook(): void {
+		self::header( 'Jurnal webhook' );
+		$rows = SCP_Webhook::log( 200 );
+		$url  = (string) SCP_Settings::get( 'webhook_url' );
+		echo '<p class="scp-lead">' . ( $url ? 'Trimiterile către <code>' . esc_html( $url ) . '</code>. Cele eșuate se reîncearcă automat la 5, 15, 60 și 180 de minute.' : 'Webhook-ul nu este configurat. <a href="' . esc_url( admin_url( 'admin.php?page=scp-settings#webhook' ) ) . '">Adaugă adresa în Setări</a>.' ) . '</p>'; // phpcs:ignore
+		if ( ! $rows ) {
+			echo '<div class="scp-panel"><p class="scp-empty">Nicio trimitere încă.</p></div>';
+			self::footer();
+			return;
+		}
+		echo '<div class="scp-panel scp-panel--flush"><table class="scp-table scp-table--log"><thead><tr><th>Când</th><th>Eveniment</th><th>Programare</th><th>Rezultat</th><th>Încercări</th><th></th></tr></thead><tbody>';
+		foreach ( $rows as $r ) {
+			$payload = json_decode( $r['payload'], true );
+			$code    = $payload['booking']['code'] ?? '';
+			echo '<tr>';
+			echo '<td class="scp-nowrap">' . esc_html( ( new DateTimeImmutable( $r['created_at'], SCP_Helpers::tz() ) )->format( 'd.m.Y H:i:s' ) ) . '</td>';
+			echo '<td><code>' . esc_html( $r['event'] ) . '</code></td>';
+			echo '<td>' . ( $r['booking_id'] ? '<a href="' . esc_url( admin_url( 'admin.php?page=scp-bookings&booking=' . (int) $r['booking_id'] ) ) . '">' . esc_html( $code ) . '</a>' : esc_html( $code ) ) . '</td>';
+			$label = array(
+				'sent'    => 'Trimis',
+				'pending' => 'În așteptare',
+				'failed'  => 'Eșuat',
+			)[ $r['status'] ] ?? $r['status'];
+			echo '<td><span class="scp-dot scp-dot--' . esc_attr( $r['status'] ) . '"></span>' . esc_html( $label ) . ( $r['response_code'] ? ' <small>HTTP ' . esc_html( (string) $r['response_code'] ) . '</small>' : '' ) . ( $r['last_error'] && 'sent' !== $r['status'] ? '<small class="scp-err">' . esc_html( $r['last_error'] ) . '</small>' : '' ) . '</td>';
+			echo '<td>' . esc_html( (string) $r['attempts'] ) . '</td>';
+			echo '<td class="scp-nowrap"><details class="scp-payload"><summary>Date trimise</summary><pre>' . esc_html( (string) wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ) . '</pre></details>';
+			if ( 'sent' !== $r['status'] ) {
+				echo ' <button type="button" class="button button-small" data-retry="' . esc_attr( (string) $r['id'] ) . '">Retrimite</button>';
+			}
+			echo '</td></tr>';
+		}
+		echo '</tbody></table></div>';
+		self::footer();
+	}
+}

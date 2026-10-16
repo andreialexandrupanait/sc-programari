@@ -1,0 +1,545 @@
+<!--
+  ȘEDINȚE FOTO DE CRĂCIUN 2026 · v6 · stefanchelmu.ro/sedinte-foto-de-craciun/
+
+  Elementor, Page Layout: Elementor Canvas. Un container Full Width, padding 0, gap 0, cu widgeturile:
+    1. HTML      – partea A (acest cod): meniu, hero, despre, decoruri, galerie, pachete, pași, cadou, titlul recenziilor
+    2. Shortcode – recenziile Google (shortcode-ul pluginului de recenzii)
+    3. HTML      – partea B: întrebări frecvente și titlul secțiunii de programare
+    4. Shortcode – [sc_programare]
+    5. HTML      – partea C: subsol, bara de programare și scripturi
+
+  Fonturi: cele ale site-ului (Fredoka One pentru titluri, Source Sans Pro pentru text), încărcate deja de Elementor.
+  Prețurile și reducerea vin din pluginul SC Programări; în cod sunt doar valori de rezervă.
+  ÎNLOCUIȚI: pozele din galeria „sezonul trecut”, pe măsură ce apar fotografii din 2026.
+-->
+<link rel="preload" href="/wp-content/plugins/sc-programari/assets/fonts/chelmu-rounded.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* fonturile vin din pluginul SC Programări: titlurile în Fredoka One (fontul din 2025), completat cu ă, ș, ț */
+@font-face{font-family:"Chelmu Rounded";font-style:normal;font-weight:400;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/chelmu-rounded.woff2) format("woff2")}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:400;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:400;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:600;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:600;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:700;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Sans Pro";font-style:normal;font-weight:700;font-display:swap;src:url(/wp-content/plugins/sc-programari/assets/fonts/source-sans-pro-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+.sc6{
+  --green:#2D661B; --green-d:#1F3A17; --green-s:#E9EFE4;
+  --gold:#CFAB62; --gold-s:#F6EEDC;
+  --cream:#F7F4EE; --line:#E4DED2;
+  --ink:#2B2925; --text:#5E5A52; --muted:#8F887B;
+  --title:"Chelmu Rounded","Fredoka One","Trebuchet MS",sans-serif;
+  --body:"Source Sans Pro","Source Sans 3","Segoe UI",Arial,sans-serif;
+  --wrap:1120px; --pad:clamp(64px,8vw,104px); --nav:68px;
+  font-family:var(--body); font-size:18px; line-height:1.6; color:var(--text); background:#fff;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:clip;
+}
+.sc6 *,.sc6 *::before,.sc6 *::after{box-sizing:border-box}
+.sc6 img{display:block;max-width:100%}
+.sc6 a{color:inherit;text-decoration:none}
+.sc6 h1,.sc6 h2,.sc6 h3,.sc6 h4,.sc6 p,.sc6 ul,.sc6 figure{margin:0;padding:0}
+.sc6 ul{list-style:none}
+.sc6 h1,.sc6 h2,.sc6 h3{font-family:var(--title);font-weight:400;color:var(--ink);letter-spacing:0;text-transform:none}
+.sc6 [hidden]{display:none!important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+.sc6 section,.sc6-anchor{scroll-margin-top:calc(var(--nav) + 12px)}
+.sc6-wrap{width:min(var(--wrap),100% - 40px);margin-inline:auto}
+.sc6-sec{padding:var(--pad) 0}
+.sc6-sec--cream{background:var(--cream)}
+.sc6-head{max-width:680px;margin:0 auto clamp(36px,5vw,56px);text-align:center}
+.sc6-head h2{font-size:clamp(30px,4vw,44px);line-height:1.15;text-wrap:balance}
+.sc6-head p{margin-top:14px;font-size:clamp(17px,1.5vw,19px)}
+.sc6-head:has(.sc6-oneline){max-width:none}
+@media (min-width:900px){.sc6 .sc6-oneline{white-space:nowrap}}
+
+/* butoane */
+.sc6-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:14px 28px;border-radius:6px;border:2px solid var(--green);background:var(--green);color:#fff!important;font-family:var(--title);font-size:17px;line-height:1.1;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.sc6-btn:hover{background:var(--green-d);border-color:var(--green-d)}
+.sc6-btn--light{background:#fff;color:var(--green)!important;border-color:#fff}
+.sc6-btn--light:hover{background:var(--green-s);border-color:var(--green-s)}
+.sc6-btn--line{background:transparent;color:var(--green)!important}
+.sc6-btn--line:hover{background:var(--green-s);border-color:var(--green)}
+.sc6-btn--ghost{background:transparent;color:#fff!important;border-color:rgba(255,255,255,.6)}
+.sc6-btn--ghost:hover{background:var(--green);border-color:var(--green);color:#fff!important}
+.sc6-btn:focus-visible,.sc6 a:focus-visible,.sc6 button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.sc6-btn svg{width:18px;height:18px;flex:none}
+
+/* ===== meniu ===== */
+.sc6-nav{position:fixed;inset:0 0 auto 0;z-index:60;height:var(--nav);display:flex;align-items:center;background:rgba(31,58,23,.0);transition:background .3s,box-shadow .3s}
+.admin-bar .sc6-nav{top:32px}
+@media (max-width:782px){.admin-bar .sc6-nav{top:46px}}
+.sc6-nav.is-solid{background:var(--green-d);box-shadow:0 2px 14px rgba(0,0,0,.18)}
+.sc6-nav .sc6-wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.sc6-logo img{height:38px;width:auto}
+.sc6-menu{display:flex;gap:28px}
+.sc6-menu a{color:#fff;font-size:16px;font-weight:600;opacity:.9}
+.sc6-menu a:hover{opacity:1;text-decoration:underline;text-underline-offset:6px}
+.sc6-burger{display:none;position:relative;width:46px;height:46px;padding:0;margin:0;border:1.5px solid rgba(255,255,255,.55);border-radius:8px;background:transparent!important;cursor:pointer;flex:none}
+.sc6-burger:hover{border-color:#fff}
+.sc6-burger span{position:absolute;left:12px;right:12px;height:2px;border-radius:2px;background:#fff;transition:transform .25s,opacity .2s}
+.sc6-burger span:nth-child(1){top:15px}.sc6-burger span:nth-child(2){top:21px}.sc6-burger span:nth-child(3){top:27px}
+.sc6-nav.is-open .sc6-burger span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.sc6-nav.is-open .sc6-burger span:nth-child(2){opacity:0}
+.sc6-nav.is-open .sc6-burger span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.sc6-nav .sc6-btn{min-height:44px;padding:10px 20px;font-size:15px;background:var(--gold);border-color:var(--gold);color:var(--green-d)!important}
+.sc6-nav .sc6-btn:hover{background:#e0bf7a;border-color:#e0bf7a}
+
+/* ===== hero ===== */
+.sc6-hero{position:relative;background:var(--green-d) url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27180%27%20height%3D%27180%27%20viewBox%3D%270%200%20180%20180%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20opacity%3D%270.08%27%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%280%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%2860%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%28120%2030%2034%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%280%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%2860%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%28120%20128%20112%29%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.08%27%3E%3Cpath%20d%3D%27M104%2025L105.4%2028.6L109%2030L105.4%2031.4L104%2035L102.6%2031.4L99%2030L102.6%2028.6Z%27%2F%3E%3Cpath%20d%3D%27M46%20134L47.12%20136.88L50%20138L47.12%20139.12L46%20142L44.88%20139.12L42%20138L44.88%20136.88Z%27%2F%3E%3Ccircle%20cx%3D%27160%27%20cy%3D%2762%27%20r%3D%271.8%27%2F%3E%3Ccircle%20cx%3D%2782%27%20cy%3D%2784%27%20r%3D%271.4%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat;background-size:180px 180px;color:rgba(255,255,255,.88)}
+.sc6-hero .sc6-wrap{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:clamp(32px,5vw,72px);padding:calc(var(--nav) + 32px) 0 84px}
+.sc6-eyebrow{display:inline-flex;align-items:center;gap:10px;font:700 13px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.sc6-eyebrow::before{content:"";width:28px;height:1.5px;background:currentColor}
+.sc6-hero h1{color:#fff;font-size:clamp(40px,5.4vw,74px);line-height:1.1;margin-top:18px;text-wrap:balance}
+.sc6-hero .sc6-lead{margin-top:20px;max-width:34ch;font-size:clamp(18px,1.7vw,21px)}
+.sc6-hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.sc6-hero-meta{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:24px;font-size:16px;color:rgba(255,255,255,.8)}
+.sc6-hero-meta b{color:#fff;font-weight:700}
+.sc6-arch{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:4/5;max-width:100%;margin:0}
+.sc6-arch::before{content:"";position:absolute;inset:-14px;border:1.5px solid var(--gold);border-radius:999px 999px 22px 22px;opacity:.7}
+.sc6-arch .slides{position:relative;width:100%;height:100%;overflow:hidden;border-radius:999px 999px 16px 16px;background:var(--green-d)}
+.sc6-arch .slides img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%;opacity:0;transform:scale(1.06);transition:opacity 1.4s ease,transform 6s ease-out}
+.sc6-arch .slides img.is-on{opacity:1;transform:scale(1)}
+.sc6-arch figcaption{position:absolute;z-index:1;left:50%;bottom:-16px;transform:translateX(-50%);white-space:nowrap;padding:6px 16px;border-radius:999px;background:var(--gold);color:var(--green-d);font:700 13px var(--body);letter-spacing:.04em}
+.sc6-arch .dots{position:absolute;left:50%;bottom:-52px;transform:translateX(-50%);display:flex;gap:10px}
+.sc6-arch .dots button{width:10px;height:10px;padding:0;border-radius:50%;border:1.5px solid var(--gold);background:transparent;cursor:pointer}
+.sc6-arch .dots button[aria-pressed="true"]{background:var(--gold)}
+@media (prefers-reduced-motion:reduce){.sc6-arch .slides img{transition:opacity .2s;transform:none!important}}
+
+/* bandă reducere: apare doar cât timp reducerea e activă în plugin */
+.sc6-early{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:12px 20px;background:var(--gold);color:var(--green-d)!important;font-size:16px;text-align:center}
+.sc6-early b{font-weight:700}.sc6-early s{opacity:.7}
+.sc6-early .go{display:inline-flex;align-items:center;gap:6px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.sc6-early svg{width:16px;height:16px;transition:transform .2s}
+.sc6-early:hover svg{transform:translateX(3px)}
+.sc6-pill{display:inline-block;padding:4px 12px;border-radius:999px;background:var(--gold);color:var(--green-d);font-family:var(--title);font-size:15px}
+
+/* ===== despre ===== */
+.sc6-about{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,6vw,72px);align-items:center}
+.sc6-about h2{font-size:clamp(30px,4vw,44px);line-height:1.15}
+.sc6-about p{margin-top:16px}
+.sc6-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+.sc6-fact{padding:18px 16px;border-radius:10px;background:var(--cream);text-align:center}
+.sc6-fact b{display:block;font-family:var(--title);font-weight:400;font-size:34px;line-height:1;color:var(--green)}
+.sc6-fact span{display:block;margin-top:8px;font-size:15px;line-height:1.35}
+.sc6-about figure{border-radius:12px;overflow:hidden;aspect-ratio:4/5;background:var(--cream)}
+.sc6-about figure img{width:100%;height:100%;object-fit:cover;object-position:42% 50%}
+
+/* ===== decoruri ===== */
+.sc6-decor{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.sc6-dc{background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.sc6-dc-img{position:relative;aspect-ratio:4/5;background:var(--line);overflow:hidden}
+.sc6-tag{position:absolute;top:12px;left:12px;z-index:1;padding:3px 10px;border-radius:999px;background:rgba(23,41,15,.72);color:#fff;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;backdrop-filter:blur(4px)}
+.sc6-dc-img picture,.sc6-dc-img img{display:block;width:100%;height:100%;object-fit:cover}
+.sc6-dc-body{padding:20px 22px 24px}
+.sc6-dc h3{font-size:23px;line-height:1.2}
+.sc6-dc p{margin-top:6px;font-size:16px}
+.sc6 .sc6-note{margin-top:40px;text-align:center;font-size:16px;color:var(--muted)}
+
+/* ===== galerie ===== */
+.sc6-gal{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sc6-gal button{position:relative;padding:0;border:0;background:var(--line);border-radius:8px;overflow:hidden;aspect-ratio:1/1;cursor:zoom-in}
+.sc6-gal img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.sc6-gal button:hover img{transform:scale(1.04)}
+.sc6-gal button[hidden]{display:none}
+.sc6-tag--y{background:rgba(255,255,255,.85);color:var(--green-d);backdrop-filter:none}
+.sc6-gal .sc6-tag{top:8px;left:8px;font-size:11px}
+.sc6-filt{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:-12px 0 26px}
+.sc6-filt button{min-height:40px;padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font:600 15px var(--body);cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.sc6-filt button:hover{border-color:var(--green)}
+.sc6-filt button.is-on{background:var(--green);border-color:var(--green);color:#fff}
+.sc6-more{margin-top:26px;text-align:center}
+.sc6-more[hidden]{display:none}
+#sc6More{background:var(--green)!important;border-color:var(--green)!important;color:#fff!important;opacity:1!important}
+#sc6More:hover{background:var(--green-d)!important}
+/* telefon: titlu și paragraf, apoi arcada, apoi butoanele; totul centrat */
+@media (max-width:760px){
+  .sc6-hero .sc6-wrap{grid-template-columns:1fr;gap:0;padding:calc(var(--nav) + 12px) 0 48px;text-align:center}
+  .sc6-hero-txt{display:contents}
+  .sc6-eyebrow{order:1;justify-self:center;gap:8px;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+  .sc6-eyebrow::before,.sc6-eyebrow::after{content:"";width:16px;height:1.5px;background:currentColor}
+  .sc6-hero h1{order:2;margin-inline:auto}
+  .sc6-hero .sc6-lead{order:3;max-width:none}
+  .sc6 .sc6-arch{order:4;width:78%;margin:46px auto 76px!important}
+  .sc6-hero-cta{order:5;margin-top:0;justify-content:center}
+  .sc6-hero-meta{order:6;justify-content:center}
+  .sc6-early{font-size:15px;padding:12px 16px}
+}
+}
+@media (max-width:760px){.sc6-filt{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;margin:-8px -20px 20px;padding:0 20px 4px;scrollbar-width:none}.sc6-filt::-webkit-scrollbar{display:none}.sc6-filt button{flex:0 0 auto}}
+
+/* ===== pachete ===== */
+.sc6-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:stretch}
+.sc6-plan{position:relative;display:flex;flex-direction:column;border-radius:12px;background:#fff;border:2px solid var(--gold);overflow:hidden;box-shadow:0 14px 34px rgba(43,41,37,.08)}
+.sc6-plan-top{padding:26px 26px 22px;text-align:center;background:var(--gold-s);border-bottom:1px solid #EADDBF}
+.sc6-plan h3{font-size:24px;line-height:1.2}
+.sc6-plan-sub{margin-top:4px;font-size:15px;color:var(--muted)}
+.sc6-price{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-top:16px}
+.sc6-price b{font-family:var(--title);font-weight:400;font-size:52px;line-height:1;color:var(--ink)}
+.sc6-price small{font-size:17px;font-weight:700;color:var(--ink)}
+.sc6-price s{font-size:20px;font-weight:600;color:var(--muted)}
+.sc6-plan ul{padding:22px 26px;flex:1}
+.sc6-plan li{position:relative;padding:9px 0 9px 30px;border-bottom:1px solid #F0ECE3;font-size:17px}
+.sc6-plan li:last-child{border-bottom:0}
+.sc6-plan li::before{content:"";position:absolute;left:2px;top:15px;width:14px;height:8px;border-left:2.5px solid var(--green);border-bottom:2.5px solid var(--green);transform:rotate(-45deg)}
+.sc6-plan-foot{display:flex;flex-direction:column;justify-content:flex-end;padding:0 26px 26px}
+.sc6-plan-foot .sc6-btn{width:100%}
+.sc6-plan-foot p{margin:0 0 12px;font-size:14px;line-height:1.4;text-align:center;color:#7A5E1F}
+.sc6-plan--main{border:2px solid var(--green);box-shadow:0 18px 40px rgba(31,58,23,.18)}
+.sc6-plan--main .sc6-plan-top{background:var(--green);border-bottom-color:var(--green)}
+.sc6-plan--main h3,.sc6-plan--main .sc6-price b,.sc6-plan--main .sc6-price small{color:#fff}
+.sc6-plan--main .sc6-plan-sub{color:rgba(255,255,255,.8)}
+.sc6-ribbon{position:absolute;top:14px;right:-38px;transform:rotate(45deg);width:150px;padding:5px 0;background:var(--gold);color:var(--green-d);font-family:var(--title);font-size:14px;text-align:center}
+.sc6-plan--extra{border:1px dashed #D9CBA7;box-shadow:none}
+.sc6-plan--extra .sc6-plan-top{background:#fff}
+.sc6-plan--extra .sc6-price b{font-size:44px}
+
+/* ===== pași ===== */
+.sc6-steps{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:start;gap:0 8px}
+.sc6-step{text-align:center;padding:0 6px}
+.sc6-step-n{display:flex;align-items:center;justify-content:center;width:64px;height:64px;margin:0 auto 18px;border-radius:50%;background:var(--green);color:#fff;font-family:var(--title);font-size:26px}
+.sc6-step h3{font-size:21px;line-height:1.25}
+.sc6-step p{margin-top:8px;font-size:16px}
+.sc6-arrow{display:flex;align-items:center;height:64px;color:var(--gold)}
+.sc6-arrow svg{width:44px;height:20px}
+
+/* ===== cadou ===== */
+.sc6-gift{position:relative;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27180%27%20height%3D%27180%27%20viewBox%3D%270%200%20180%20180%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20opacity%3D%270.08%27%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%280%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%2860%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%28120%2030%2034%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%280%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%2860%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%28120%20128%20112%29%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.08%27%3E%3Cpath%20d%3D%27M104%2025L105.4%2028.6L109%2030L105.4%2031.4L104%2035L102.6%2031.4L99%2030L102.6%2028.6Z%27%2F%3E%3Cpath%20d%3D%27M46%20134L47.12%20136.88L50%20138L47.12%20139.12L46%20142L44.88%20139.12L42%20138L44.88%20136.88Z%27%2F%3E%3Ccircle%20cx%3D%27160%27%20cy%3D%2762%27%20r%3D%271.8%27%2F%3E%3Ccircle%20cx%3D%2782%27%20cy%3D%2784%27%20r%3D%271.4%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E")!important;background-size:180px 180px!important;display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(28px,5vw,64px);align-items:center;padding:clamp(28px,4vw,48px);border-radius:14px;background:var(--green-d);color:rgba(255,255,255,.88)}
+.sc6-gift h2{color:#fff;font-size:clamp(28px,3.4vw,38px);line-height:1.15}
+.sc6-gift p{margin-top:14px}
+.sc6-gift-fine{font-size:15px;color:rgba(255,255,255,.7)}
+.sc6-gift-box{padding:24px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
+.sc6-gift-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.14);color:#fff}
+.sc6-gift-row b{font-family:var(--title);font-weight:400;font-size:28px}
+a.sc6-gift-row{transition:color .2s}
+.sc6-gift-row em{display:block;margin-top:2px;font-style:normal;font-size:14px;color:var(--gold);text-decoration:underline;text-underline-offset:3px}
+a.sc6-gift-row:hover em{color:#fff}
+.sc6-gift-box .sc6-btn{width:100%;margin-top:20px}
+
+/* ===== recenzii ===== */
+.sc6-reviews-head{padding-bottom:0}
+.sc6-reviews-head .sc6-head{margin-bottom:28px}
+
+/* ===== FAQ ===== */
+.sc6-faq{max-width:820px;margin:0 auto}
+.sc6-qa{border-bottom:1px solid var(--line)}
+.sc6-qa:first-child{border-top:1px solid var(--line)}
+.sc6-qa button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px 4px;background:none;border:0;cursor:pointer;text-align:left;font-family:var(--body);font-size:19px;font-weight:700;line-height:1.35;color:var(--ink)}
+.sc6-qa button i{flex:none;position:relative;width:16px;height:16px}
+.sc6-qa button i::before,.sc6-qa button i::after{content:"";position:absolute;left:0;top:7px;width:16px;height:2px;background:var(--green);transition:transform .25s}
+.sc6-qa button i::after{transform:rotate(90deg)}
+.sc6-qa.is-open button i::after{transform:rotate(0)}
+.sc6-qa-a{display:none;padding:0 4px 22px}
+.sc6-qa.is-open .sc6-qa-a{display:block}
+
+/* ===== programare ===== */
+.sc6-book{background:var(--green-d);color:rgba(255,255,255,.88)}
+.sc6-book .sc6-head h2{color:#fff}
+.sc6-book .sc6-head{margin-bottom:0}
+.sc6-book-head{padding-bottom:36px}
+.sc6-contact{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 28px;margin-top:22px;font-size:17px}
+.sc6-contact a{display:inline-flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+.sc6-contact svg{width:20px;height:20px;color:var(--gold)}
+
+
+/* ===== decor de Crăciun: model discret de fulgi și steluțe, separator auriu sub titluri ===== */
+.sc6-sec--cream{background:var(--cream) url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27180%27%20height%3D%27180%27%20viewBox%3D%270%200%20180%20180%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23CFAB62%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20opacity%3D%270.24%27%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%280%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%2860%2030%2034%29%27%2F%3E%3Cline%20x1%3D%2730%27%20y1%3D%2724%27%20x2%3D%2730%27%20y2%3D%2744%27%20transform%3D%27rotate%28120%2030%2034%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%280%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%2860%20128%20112%29%27%2F%3E%3Cline%20x1%3D%27128%27%20y1%3D%27105%27%20x2%3D%27128%27%20y2%3D%27119%27%20transform%3D%27rotate%28120%20128%20112%29%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23CFAB62%27%20opacity%3D%270.24%27%3E%3Cpath%20d%3D%27M104%2025L105.4%2028.6L109%2030L105.4%2031.4L104%2035L102.6%2031.4L99%2030L102.6%2028.6Z%27%2F%3E%3Cpath%20d%3D%27M46%20134L47.12%20136.88L50%20138L47.12%20139.12L46%20142L44.88%20139.12L42%20138L44.88%20136.88Z%27%2F%3E%3Ccircle%20cx%3D%27160%27%20cy%3D%2762%27%20r%3D%271.8%27%2F%3E%3Ccircle%20cx%3D%2782%27%20cy%3D%2784%27%20r%3D%271.4%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat;background-size:180px 180px}
+.sc6-head h2::after{content:"";display:block;width:120px;height:16px;margin:14px auto 0;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27120%27%20height%3D%2716%27%20viewBox%3D%270%200%20120%2016%27%3E%3Cg%20fill%3D%27%23CFAB62%27%3E%3Crect%20x%3D%270%27%20y%3D%277.3%27%20width%3D%2744%27%20height%3D%271.4%27%20rx%3D%27.7%27%2F%3E%3Crect%20x%3D%2776%27%20y%3D%277.3%27%20width%3D%2744%27%20height%3D%271.4%27%20rx%3D%27.7%27%2F%3E%3Cpath%20d%3D%27M60%200L62.6%205.4L68%208L62.6%2010.6L60%2016L57.4%2010.6L52%208L57.4%205.4Z%27%2F%3E%3Ccircle%20cx%3D%2749%27%20cy%3D%278%27%20r%3D%271.6%27%2F%3E%3Ccircle%20cx%3D%2771%27%20cy%3D%278%27%20r%3D%271.6%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") no-repeat center/contain}
+.sc6-about .sc6-head h2::after,.sc6-about h2::after,.sc6-gift h2::after{margin-left:0}
+.sc6-garland{height:40px;margin-top:-1px;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27240%27%20height%3D%2740%27%20viewBox%3D%270%200%20240%2040%27%3E%3Cpath%20d%3D%27M0%204%20Q60%2030%20120%204%20T240%204%27%20fill%3D%27none%27%20stroke%3D%27%23CFAB62%27%20stroke-width%3D%271.4%27%20opacity%3D%27.7%27%2F%3E%3Cg%3E%3Cline%20x1%3D%2740%27%20y1%3D%2714%27%20x2%3D%2740%27%20y2%3D%2722%27%20stroke%3D%27%23CFAB62%27%20stroke-width%3D%271.2%27%2F%3E%3Ccircle%20cx%3D%2740%27%20cy%3D%2727%27%20r%3D%275.5%27%20fill%3D%27%232D661B%27%2F%3E%3Cline%20x1%3D%27120%27%20y1%3D%275%27%20x2%3D%27120%27%20y2%3D%2712%27%20stroke%3D%27%23CFAB62%27%20stroke-width%3D%271.2%27%2F%3E%3Ccircle%20cx%3D%27120%27%20cy%3D%2717%27%20r%3D%275%27%20fill%3D%27%23CFAB62%27%2F%3E%3Cline%20x1%3D%27200%27%20y1%3D%2714%27%20x2%3D%27200%27%20y2%3D%2722%27%20stroke%3D%27%23CFAB62%27%20stroke-width%3D%271.2%27%2F%3E%3Ccircle%20cx%3D%27200%27%20cy%3D%2727%27%20r%3D%275.5%27%20fill%3D%27%23B5402E%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat-x top center/240px 40px}
+
+.sc6-sec-cta{display:flex;justify-content:center;margin-top:36px}
+.sc6-sec-cta--left{justify-content:flex-start;margin-top:28px}
+@media (max-width:760px){.sc6-sec-cta--left{justify-content:center}.sc6-sec-cta .sc6-btn{width:100%;max-width:360px}}
+/* ===== responsive ===== */
+@media (max-width:1020px){
+  .sc6-burger{display:block}
+  .sc6-nav .sc6-wrap{gap:12px}
+  .sc6-nav .sc6-btn{margin-left:auto}
+  .sc6-nav.is-open{background:var(--green-d);box-shadow:0 2px 14px rgba(0,0,0,.18)}
+  .sc6-menu{display:none;position:absolute;left:0;right:0;top:100%;flex-direction:column;gap:0;padding:6px 20px 18px;background:var(--green-d);box-shadow:0 12px 24px rgba(0,0,0,.22);max-height:calc(100vh - var(--nav));overflow-y:auto}
+  .sc6-nav.is-open .sc6-menu{display:flex}
+  .sc6-menu a{display:block;padding:14px 4px;font-size:18px;opacity:1;border-bottom:1px solid rgba(255,255,255,.12)}
+  .sc6-menu a:last-child{border-bottom:0}
+  .sc6-menu a:hover{text-decoration:none;color:var(--gold)}
+  .sc6-plans{grid-template-columns:1fr 1fr}
+  .sc6-plan--extra{grid-column:1/-1}
+  .sc6-steps{grid-template-columns:1fr auto 1fr;row-gap:28px}
+  .sc6-steps .sc6-arrow:nth-of-type(2){display:none}
+}
+@media (max-width:760px){
+  .sc6{font-size:17px}
+  .sc6-about,.sc6-gift{grid-template-columns:1fr}
+  .sc6-about figure{aspect-ratio:4/3}
+  .sc6-facts{gap:10px}
+  .sc6-fact b{font-size:28px}
+  .sc6-decor{grid-template-columns:1fr;gap:18px}
+  .sc6-dc-img{aspect-ratio:16/10}
+  .sc6-gal{grid-template-columns:repeat(2,1fr)}
+  .sc6-plans{grid-template-columns:1fr}
+  .sc6-steps{grid-template-columns:1fr;justify-items:center}
+  .sc6-steps .sc6-arrow{display:flex!important;height:34px;transform:rotate(90deg)}
+  .sc6-step{max-width:360px}
+  .sc6-nav .sc6-btn{display:none}
+  .sc6-gal{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+
+<div class="sc6" id="sc6">
+
+<!-- ============ MENIU ============ -->
+<header class="sc6-nav" id="sc6Nav">
+  <div class="sc6-wrap">
+    <a class="sc6-logo" href="/" aria-label="Ștefan Chelmu, pagina principală"><img src="/wp-content/uploads/2023/11/Logo-stefan-chelmu-alb.png" alt="Ștefan Chelmu" width="170" height="38"></a>
+    <nav class="sc6-menu" id="sc6Menu" aria-label="Secțiuni">
+      <a href="#despre">Despre</a>
+      <a href="#decoruri">Decoruri</a>
+      <a href="#pachete">Pachete</a>
+      <a href="#recenzii">Recenzii</a>
+      <a href="#intrebari">Întrebări</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a class="sc6-btn" href="#programare">Programează ședința</a>
+    <button type="button" class="sc6-burger" id="sc6Burger" aria-label="Deschide meniul" aria-expanded="false" aria-controls="sc6Menu"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="sc6-hero" id="sus">
+  <div class="sc6-wrap">
+    <div class="sc6-hero-txt">
+      <span class="sc6-eyebrow">Galați · 1 noiembrie – 24 decembrie</span>
+      <h1>Ședințe foto de Crăciun 2026</h1>
+      <p class="sc6-lead">O oră în studioul din Galați, în trei decoruri noi, construite de la zero pentru sezonul acesta. Pentru familii și, mai ales, pentru cei mici.</p>
+      <div class="sc6-hero-cta">
+        <a class="sc6-btn sc6-btn--light" href="#programare">Programează ședința</a>
+        <a class="sc6-btn sc6-btn--ghost" href="tel:+40749270232" data-ev="call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg>0749 270 232</a>
+      </div>
+      <div class="sc6-hero-meta"><span>Pachete de la <b><span data-price="foto">450</span> lei</b></span><span>Fotografiile în <b>7 zile lucrătoare</b></span></div>
+    </div>
+    <figure class="sc6-arch" id="sc6Arch" aria-roledescription="carusel" aria-label="Decorurile din 2026">
+      <div class="slides">
+        <img class="is-on" src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-800.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-800.webp 800w" sizes="(max-width:760px) 78vw, 460px" width="800" height="1055" alt="Decorul Carusel de Crăciun, randare" data-name="Carusel de Crăciun" fetchpriority="high">
+        <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-800.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-800.webp 800w" sizes="(max-width:760px) 78vw, 460px" width="800" height="1000" alt="Decorul Atelierul lui Moș Crăciun, randare" data-name="Atelierul lui Moș Crăciun" loading="lazy">
+        <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-800.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-800.webp 800w" sizes="(max-width:760px) 78vw, 460px" width="800" height="1000" alt="Decorul Crăciunul elegant, randare" data-name="Crăciunul elegant" loading="lazy">
+      </div>
+      <figcaption><span class="nm">Carusel de Crăciun</span> · randare</figcaption>
+      <div class="dots" role="group" aria-label="Alege decorul"><button type="button" aria-label="Carusel de Crăciun" aria-pressed="true"></button><button type="button" aria-label="Atelierul lui Moș Crăciun" aria-pressed="false"></button><button type="button" aria-label="Crăciunul elegant" aria-pressed="false"></button></div>
+    </figure>
+  </div>
+</section>
+
+<!-- bandă reducere: apare doar cât timp reducerea e activă în plugin -->
+<a class="sc6-early" data-early hidden href="#programare" data-pick="foto"><span>Până pe <b>15 noiembrie</b>, Pachetul Foto costă <b><span data-price="foto">450</span> lei</b> în loc de <s data-list="foto">550</s></span><span class="go">Alege-l acum <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+
+<!-- ============ DESPRE ============ -->
+<section class="sc6-sec" id="despre">
+  <div class="sc6-wrap sc6-about">
+    <div>
+      <h2>De ce o ședință de Crăciun în studio</h2>
+      <p>În fiecare toamnă golim studioul și construim decorurile de la zero. Le facem pentru familii, dar mai ales pentru cei mici, care au voie să le atingă, să le exploreze și să se joace în ele.</p>
+      <p>Ședința durează o oră, ca nimeni să nu se grăbească: copiii au timp să se obișnuiască cu decorul și cu aparatul foto, iar pozele ies naturale. Fotografiile le puteți oferi și bunicilor, mătușilor sau prietenilor, ca amintiri care rămân în familie.</p>
+      <div class="sc6-facts">
+        <div class="sc6-fact"><b>1 oră</b><span>în studio, în ritmul celor mici</span></div>
+        <div class="sc6-fact"><b>3</b><span>decoruri, toate în aceeași ședință</span></div>
+        <div class="sc6-fact"><b>40</b><span>de fotografii editate, în 7 zile lucrătoare</span></div>
+      </div>
+      <div class="sc6-sec-cta sc6-sec-cta--left"><a class="sc6-btn" href="#programare">Programează ședința</a></div>
+    </div>
+    <figure>
+      <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-1200.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-640.webp 640w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-1200.webp 1200w" sizes="(max-width:760px) calc(100vw - 40px), 45vw" width="1200" height="675" alt="Ursuleț pe sanie în decorul Atelierul lui Moș Crăciun" loading="lazy" decoding="async">
+    </figure>
+  </div>
+</section>
+
+<!-- ============ DECORURI 2026 ============ -->
+<section class="sc6-sec sc6-sec--cream" id="decoruri">
+  <div class="sc6-wrap">
+    <div class="sc6-head">
+      <h2>Decorurile din 2026</h2>
+      <p>Trei decoruri noi, construite în studio. Într-o singură ședință treceți prin toate trei.</p>
+    </div>
+    <div class="sc6-decor">
+      <article class="sc6-dc">
+        <div class="sc6-dc-img"><span class="sc6-tag" title="Imagine realizată pe calculator după proiectul decorului">Randare</span><picture>
+          <source media="(max-width:760px)" type="image/webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-h-640.webp 640w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-h-1200.webp 1200w" sizes="calc(100vw - 40px)">
+          <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-480.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-800.webp 800w" sizes="(max-width:1160px) 31vw, 360px" width="800" height="1055" alt="Decorul Carusel de Crăciun: căluț alb cu auriu pe un podium albastru, între brazi luminați" loading="lazy" decoding="async">
+        </picture></div>
+        <div class="sc6-dc-body"><h3>Carusel de Crăciun</h3><p>Un căluț de carusel între brazi albi și ferestre luminate.</p></div>
+      </article>
+      <article class="sc6-dc">
+        <div class="sc6-dc-img"><span class="sc6-tag" title="Imagine realizată pe calculator după proiectul decorului">Randare</span><picture>
+          <source media="(max-width:760px)" type="image/webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-640.webp 640w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-1200.webp 1200w" sizes="calc(100vw - 40px)">
+          <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-480.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-800.webp 800w" sizes="(max-width:1160px) 31vw, 360px" width="800" height="1000" alt="Decorul Atelierul lui Moș Crăciun: căsuță verde de lemn, ursuleț pe sanie și cutia scrisorilor" loading="lazy" decoding="async">
+        </picture></div>
+        <div class="sc6-dc-body"><h3>Atelierul lui Moș Crăciun</h3><p>Căsuța de lemn unde se fac jucăriile, cu sania pregătită de drum.</p></div>
+      </article>
+      <article class="sc6-dc">
+        <div class="sc6-dc-img"><span class="sc6-tag" title="Imagine realizată pe calculator după proiectul decorului">Randare</span><picture>
+          <source media="(max-width:760px)" type="image/webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-h-640.webp 640w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-h-1200.webp 1200w" sizes="calc(100vw - 40px)">
+          <img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-480.webp" srcset="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-480.webp 480w, /wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-800.webp 800w" sizes="(max-width:1160px) 31vw, 360px" width="800" height="1000" alt="Decorul Crăciunul elegant: masă cu lumânări, pian alb, brad și canapea crem" loading="lazy" decoding="async">
+        </picture></div>
+        <div class="sc6-dc-body"><h3>Crăciunul elegant</h3><p>Un salon cald, cu pian alb și lumânări, pentru portretele de familie.</p></div>
+      </article>
+    </div>
+    <p class="sc6-note">Imaginile decorurilor 2026 sunt randări după proiect. Fotografiile din studio le adăugăm pe măsură ce decorurile sunt gata.</p>
+    <div class="sc6-sec-cta"><a class="sc6-btn" href="#programare">Programează ședința</a></div>
+  </div>
+</section>
+
+<!-- ============ GALERIE: DECORURILE DIN FIECARE AN ============ -->
+<section class="sc6-sec" id="galerie">
+  <div class="sc6-wrap">
+    <div class="sc6-head">
+      <h2>Decorurile noastre, an de an</h2>
+      <p class="sc6-oneline">În fiecare toamnă construim alt Crăciun. Uite cum au arătat decorurile din studio în ultimii ani.</p>
+    </div>
+    <div class="sc6-filt" role="group" aria-label="Alege anul"><button type="button" data-f="all" class="is-on" aria-pressed="true">Toate</button><button type="button" data-f="2026" aria-pressed="false">Decoruri 2026</button><button type="button" data-f="2025" aria-pressed="false">2025</button><button type="button" data-f="2024" aria-pressed="false">2024</button><button type="button" data-f="2023" aria-pressed="false">2023</button><button type="button" data-f="2022" aria-pressed="false">2022</button><button type="button" data-f="2021" aria-pressed="false">2021</button></div>
+    <div class="sc6-gal" id="sc6Gal">
+      <button type="button" data-y="2026" data-full="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-lat-1916.webp" aria-label="Mărește: Decorul Carusel de Crăciun, 2026 (randare)"><span class="sc6-tag">Randare</span><img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-carusel-v-480.webp" alt="Decorul Carusel de Crăciun, 2026 (randare)" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2026" data-full="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-h-1200.webp" aria-label="Mărește: Decorul Atelierul lui Moș Crăciun, 2026 (randare)"><span class="sc6-tag">Randare</span><img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-atelier-v-480.webp" alt="Decorul Atelierul lui Moș Crăciun, 2026 (randare)" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2026" data-full="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-h-1200.webp" aria-label="Mărește: Decorul Crăciunul elegant, 2026 (randare)"><span class="sc6-tag">Randare</span><img src="/wp-content/uploads/2026/10/stefan-chelmu-decor-craciun-2026-elegant-v-480.webp" alt="Decorul Crăciunul elegant, 2026 (randare)" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-01-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-01-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-01-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-01-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-01-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-01-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-01-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-01-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-01-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-01-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-02-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-02-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-02-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-02-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-02-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-02-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-02-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-02-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-02-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-02-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-03-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-03-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-03-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-03-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-03-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-03-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-03-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-03-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-03-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-03-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-04-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-04-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-04-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-04-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-04-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-04-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-04-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-04-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-04-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-04-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-05-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-05-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-05-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-05-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-05-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-05-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-05-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-05-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-05-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-05-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-06-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-06-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2024" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-06-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2024"><span class="sc6-tag sc6-tag--y">2024</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2024-galerie-06-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2024" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2023" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-06-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2023"><span class="sc6-tag sc6-tag--y">2023</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2023-galerie-06-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2023" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2022" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-06-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2022"><span class="sc6-tag sc6-tag--y">2022</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2022-galerie-06-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2022" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2021" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-06-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2021"><span class="sc6-tag sc6-tag--y">2021</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2021-galerie-06-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2021" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-07-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-07-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-08-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-08-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+      <button type="button" data-y="2025" data-full="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-09-1600.webp" aria-label="Mărește: Decor de Crăciun din studioul Ștefan Chelmu, 2025"><span class="sc6-tag sc6-tag--y">2025</span><img src="/wp-content/uploads/2026/10/galerie/stefan-chelmu-craciun-2025-galerie-09-480.webp" alt="Decor de Crăciun din studioul Ștefan Chelmu, 2025" loading="lazy" decoding="async"></button>
+    </div>
+    <div class="sc6-more"><button type="button" class="sc6-btn" id="sc6More">Arată toate fotografiile</button></div>
+  </div>
+</section>
+
+<!-- ============ PACHETE ============ -->
+<section class="sc6-sec sc6-sec--cream" id="pachete">
+  <div class="sc6-garland" aria-hidden="true" style="margin:calc(var(--pad) * -1) 0 calc(var(--pad) - 40px)"></div>
+  <div class="sc6-wrap">
+    <div class="sc6-head">
+      <h2>Pachete</h2>
+      <p>Ambele pachete includ o oră în studio, cele trei decoruri și 40 de fotografii editate. Diferența o face Moș Crăciun.</p>
+    </div>
+    <div class="sc6-plans">
+      <article class="sc6-plan">
+        <span class="sc6-ribbon" data-early hidden>−<span data-discount="foto">100</span> lei</span>
+        <div class="sc6-plan-top">
+          <h3>Pachet Foto</h3>
+          <p class="sc6-plan-sub">Ședință de o oră</p>
+          <div class="sc6-price"><s data-early hidden><span data-list="foto">550</span></s><b data-price="foto">550</b><small>lei</small></div>
+        </div>
+        <ul>
+          <li>3 decoruri diferite</li>
+          <li>40 de fotografii editate</li>
+          <li>Fotografiile online, în 7 zile lucrătoare</li>
+        </ul>
+        <div class="sc6-plan-foot">
+          <p data-early hidden>Prețul redus e valabil pentru rezervările făcute până pe <span data-early-until>15 noiembrie</span>.</p>
+          <a class="sc6-btn" href="#programare" data-pick="foto">Alege Pachetul Foto</a>
+        </div>
+      </article>
+      <article class="sc6-plan sc6-plan--main">
+        <div class="sc6-plan-top">
+          <h3>Pachet Foto Plus</h3>
+          <p class="sc6-plan-sub">Ședință de o oră, cu Moș Crăciun</p>
+          <div class="sc6-price"><b data-price="foto_plus">650</b><small>lei</small></div>
+        </div>
+        <ul>
+          <li>3 decoruri diferite</li>
+          <li>40 de fotografii editate</li>
+          <li>Moș Crăciun în studio, pe toată durata ședinței</li>
+          <li>Fotografiile online, în 7 zile lucrătoare</li>
+        </ul>
+        <div class="sc6-plan-foot">
+          <a class="sc6-btn" href="#programare" data-pick="foto_plus">Alege Pachetul Foto Plus</a>
+        </div>
+      </article>
+      <article class="sc6-plan sc6-plan--extra">
+        <div class="sc6-plan-top">
+          <h3>Album foto de Crăciun</h3>
+          <p class="sc6-plan-sub">Opțional, la oricare pachet</p>
+          <div class="sc6-price"><b>365</b><small>lei</small></div>
+        </div>
+        <ul>
+          <li>10 deschideri</li>
+          <li>Livrat în 3 săptămâni</li>
+          <li>Îl comandați după ședință, din fotografiile alese</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CUM DECURGE ============ -->
+<section class="sc6-sec" id="pasi">
+  <div class="sc6-wrap">
+    <div class="sc6-head">
+      <h2>Cum decurge</h2>
+    </div>
+    <div class="sc6-steps">
+      <div class="sc6-step"><span class="sc6-step-n">1</span><h3>Rezervi ora</h3><p>Alegi pachetul, ziua și ora în formular. Ora rămâne a ta 48 de ore.</p></div>
+      <span class="sc6-arrow" aria-hidden="true"><svg viewBox="0 0 44 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10h38M32 3l8 7-8 7"/></svg></span>
+      <div class="sc6-step"><span class="sc6-step-n">2</span><h3>Plătești online</h3><p>Din linkul primit pe pagină și pe email. Confirmarea vine imediat.</p></div>
+      <span class="sc6-arrow" aria-hidden="true"><svg viewBox="0 0 44 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10h38M32 3l8 7-8 7"/></svg></span>
+      <div class="sc6-step"><span class="sc6-step-n">3</span><h3>Veniți în studio</h3><p>O oră, prin toate cele trei decoruri, în ritmul celor mici.</p></div>
+      <span class="sc6-arrow" aria-hidden="true"><svg viewBox="0 0 44 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10h38M32 3l8 7-8 7"/></svg></span>
+      <div class="sc6-step"><span class="sc6-step-n">4</span><h3>Primiți fotografiile</h3><p>40 de fotografii editate, online, în 7 zile lucrătoare.</p></div>
+    </div>
+    <div class="sc6-sec-cta"><a class="sc6-btn" href="#programare">Programează ședința</a></div>
+  </div>
+</section>
+
+<!-- ============ CADOU ============ -->
+<section class="sc6-sec sc6-sec--cream" id="cadou">
+  <div class="sc6-wrap">
+    <div class="sc6-gift">
+      <div>
+        <h2>Oferă o ședință foto cadou</h2>
+        <p>Cumperi online voucherul pentru Pachetul Foto sau pentru Pachetul Foto Plus și primești codul pe email, gata de dăruit. Cel care îl primește își alege singur ziua și ora în formular, iar programarea e confirmată imediat, fără altă plată.</p>
+        <p class="sc6-gift-fine">Voucherul se folosește o singură dată, pentru pachetul cumpărat, la o ședință din sezonul acesta, până pe 24 decembrie 2026.</p>
+      </div>
+      <div class="sc6-gift-box">
+        <a class="sc6-gift-row" href="/voucher-craciun-2026/?pachet=foto" data-ev="voucher"><span>Voucher Pachet Foto<em>Cumpără</em></span><b><span data-list="foto">550</span> lei</b></a>
+        <a class="sc6-gift-row" href="/voucher-craciun-2026/?pachet=foto_plus" data-ev="voucher"><span>Voucher Pachet Foto Plus<em>Cumpără</em></span><b><span data-list="foto_plus">650</span> lei</b></a>
+        <a class="sc6-btn sc6-btn--light" href="/voucher-craciun-2026/?pachet=foto" data-ev="voucher">Cumpără un voucher</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RECENZII (titlu; recenziile vin din widgetul următor) ============ -->
+<section class="sc6-sec sc6-reviews-head" id="recenzii">
+  <div class="sc6-wrap">
+    <div class="sc6-head">
+      <h2>Ce spun părinții</h2>
+      <p>Recenziile lăsate pe Google de familiile care au fost la noi.</p>
+    </div>
+  </div>
+</section>
+</div>
