@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.2.2
+ * Version:           1.2.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -13,7 +13,18 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SCP_VERSION', '1.2.2' );
+// O a doua copie a pluginului (alt folder) nu se mai încarcă: altfel clasele s-ar declara de două ori.
+if ( defined( 'SCP_VERSION' ) ) {
+	add_action(
+		'admin_notices',
+		static function () {
+			echo '<div class="notice notice-error"><p><strong>SC Programări Crăciun</strong> este instalat de două ori. Păstrează doar folderul <code>sc-programari</code> și șterge copia în plus din pagina de module.</p></div>';
+		}
+	);
+	return;
+}
+
+define( 'SCP_VERSION', '1.2.3' );
 define( 'SCP_DB_VERSION', '5' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
