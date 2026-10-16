@@ -17,6 +17,29 @@ class SCP_Frontend {
 	public static function register(): void {
 		wp_register_style( 'scp-front', SCP_URL . 'assets/css/front.css', array(), SCP_VERSION );
 		wp_register_script( 'scp-front', SCP_URL . 'assets/js/front.js', array(), SCP_VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		// Pe pagina cu formularul, CSS-ul intră în <head> (altfel ar apărea în subsol, după ce pagina s-a afișat deja).
+		if ( self::page_has_form() ) {
+			wp_enqueue_style( 'scp-front' );
+			add_action( 'wp_head', array( __CLASS__, 'preload_fonts' ), 2 );
+		}
+	}
+
+	private static function page_has_form(): bool {
+		if ( ! is_singular() ) {
+			return false;
+		}
+		$id = (int) get_queried_object_id();
+		if ( ! $id ) {
+			return false;
+		}
+		return has_shortcode( (string) get_post_field( 'post_content', $id ), 'sc_programare' )
+			|| str_contains( (string) get_post_meta( $id, '_elementor_data', true ), 'sc_programare' );
+	}
+
+	public static function preload_fonts(): void {
+		foreach ( array( 'chelmu-rounded.woff2', 'source-sans-pro-latin-400-normal.woff2' ) as $f ) {
+			echo '<link rel="preload" href="' . esc_url( SCP_URL . 'assets/fonts/' . $f ) . '" as="font" type="font/woff2" crossorigin>' . "\n";
+		}
 	}
 
 	/**
@@ -56,7 +79,10 @@ class SCP_Frontend {
 			return '';
 		}
 		$until = (string) SCP_Settings::get( 'early_until' );
-		$date  = (int) substr( $until, 8, 2 ) . ' ' . SCP_Helpers::MONTHS[ (int) substr( $until, 5, 2 ) ];
+		if ( ! SCP_Helpers::is_date( $until ) ) {
+			return '';
+		}
+		$date = (int) substr( $until, 8, 2 ) . ' ' . ( SCP_Helpers::MONTHS[ (int) substr( $until, 5, 2 ) ] ?? '' );
 		$hours = (int) SCP_Settings::get( 'pay_hours' );
 		return '<strong>Pentru rezervările făcute până pe ' . esc_html( $date ) . ', ' . esc_html( implode( ', ', $items ) ) . '</strong>' . ( $hours ? esc_html( ', cu plata online în ' . $hours . ' de ore.' ) : '.' );
 	}

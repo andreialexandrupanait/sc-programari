@@ -1,0 +1,225 @@
+{
+  "name": "SC Programări 2026 → Google Sheet (verificare de noapte)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "b2f0c1d2-0001-4c3b-9a01-000000000001",
+      "name": "În fiecare noapte, 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://stefanchelmu.ro/wp-json/scp/v1/sheet",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "b2f0c1d2-0002-4c3b-9a01-000000000002",
+      "name": "Citește toate programările",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "SCP cheie (X-SCP-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.rows || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2f0c1d2-0003-4c3b-9a01-000000000003",
+      "name": "Are rânduri?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1UpZ28mYV0xz6TS1Z01Lt4O48FGBz_WBkMDddG7c9UZY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Programari"
+        },
+        "clear": "wholeSheet",
+        "keepFirstRow": true
+      },
+      "id": "b2f0c1d2-0004-4c3b-9a01-000000000004",
+      "name": "Golește Programari (păstrează antetul)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un item pentru fiecare programare, din răspunsul pluginului.\nconst rows = $('Citește toate programările').first().json.rows || [];\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "b2f0c1d2-0005-4c3b-9a01-000000000005",
+      "name": "Rânduri",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1UpZ28mYV0xz6TS1Z01Lt4O48FGBz_WBkMDddG7c9UZY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Programari"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "b2f0c1d2-0006-4c3b-9a01-000000000006",
+      "name": "Scrie tot în Programari",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "În fiecare noapte, 03:00": {
+      "main": [
+        [
+          {
+            "node": "Citește toate programările",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Citește toate programările": {
+      "main": [
+        [
+          {
+            "node": "Are rânduri?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Are rânduri?": {
+      "main": [
+        [
+          {
+            "node": "Golește Programari (păstrează antetul)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Golește Programari (păstrează antetul)": {
+      "main": [
+        [
+          {
+            "node": "Rânduri",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rânduri": {
+      "main": [
+        [
+          {
+            "node": "Scrie tot în Programari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Bucharest"
+  },
+  "active": false
+}

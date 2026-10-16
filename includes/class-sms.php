@@ -7,7 +7,8 @@ defined( 'ABSPATH' ) || exit;
  * care rulează din cronul real al serverului (DISABLE_WP_CRON + crontab).
  *
  * Reguli:
- *  - reamintirile se programează doar când programarea e plătită (online, numerar sau voucher);
+ *  - reamintirile se programează doar când programarea e sigură: plătită (online, cash, card, voucher)
+ *    sau confirmată cu plata la studio;
  *  - la anulare se șterg, la mutarea slotului se reprogramează;
  *  - fiecare job verifică la rulare dacă programarea mai e valabilă, plătită și pe același slot;
  *  - fiecare mesaj are un singur rând în jurnal (index unic rezervare + tip), deci nu pleacă de două ori;
@@ -17,8 +18,7 @@ class SCP_SMS {
 
 	const OPTION   = 'scp_sms_settings';
 	const GROUP    = 'scp-sms';
-	const TYPES    = array( 'created', 'paid', 'remind_day', 'remind_hour' );
-	const PAID_SET = array( 'paid', 'cash', 'voucher' );
+	const TYPES    = array( 'created', 'paid', 'moved', 'remind_day', 'remind_hour' );
 	const BACKOFF  = array( 2, 10, 30, 60, 120 ); // minute între încercări
 	const MAX_TRY  = 5;
 
@@ -41,18 +41,26 @@ class SCP_SMS {
 				'created'     => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Ti-am rezervat sedinta foto {ziua} {data}, ora {ora}. Plateste {termen} ca sa pastrezi ora: {link}' ),
 				'paid'        => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Plata a ajuns, sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'voucher'     => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata cu voucherul tau: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
+				'studio'      => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Plata la studio, cash sau card.' ),
+				'moved'       => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun s-a mutat: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'remind_day'  => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Te asteptam maine, {ziua} {data}, la ora {ora}, la sedinta foto de Craciun. {adresa}. Info: {telefon_studio}' ),
 				'remind_hour' => array( 'enabled' => 1, 'body' => 'Ne vedem intr-o ora, la {ora}, la sedinta foto de Craciun. {adresa}. Daca intarzii, suna-ne la {telefon_studio}.' ),
 			),
 		);
 	}
 
+	private static ?array $settings = null;
+
 	public static function settings(): array {
+		if ( null !== self::$settings ) {
+			return self::$settings;
+		}
 		$saved = get_option( self::OPTION, array() );
 		$saved = is_array( $saved ) ? $saved : array();
 		$def   = self::defaults();
 		$out   = array_merge( $def, $saved );
 		$out['templates'] = array_replace_recursive( $def['templates'], (array) ( $saved['templates'] ?? array() ) );
+		self::$settings   = $out;
 		return $out;
 	}
 
@@ -61,7 +69,8 @@ class SCP_SMS {
 	}
 
 	public static function save( array $values ): void {
-		update_option( self::OPTION, array_merge( self::settings(), $values ), false );
+		update_option( self::OPTION, array_merge( self::settings(), $values ), true );
+		self::$settings = null;
 	}
 
 	public static function provider(): SCP_SMS_Provider {
@@ -85,8 +94,9 @@ class SCP_SMS {
 	public static function init(): void {
 		add_action( 'scp_booking_created', array( __CLASS__, 'on_created' ), 40 );
 		add_action( 'scp_booking_paid', array( __CLASS__, 'on_paid' ), 40 );
+		add_action( 'scp_booking_studio', array( __CLASS__, 'on_paid' ), 40 );
 		add_action( 'scp_booking_cancelled', array( __CLASS__, 'on_cancelled' ), 40, 1 );
-		add_action( 'scp_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ), 40, 2 );
+		add_action( 'scp_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ), 40, 3 );
 
 		add_action( 'scp_sms_send', array( __CLASS__, 'job_send' ), 10, 3 );
 		add_action( 'scp_sms_check', array( __CLASS__, 'job_check' ), 10, 1 );
@@ -96,15 +106,16 @@ class SCP_SMS {
 		add_action( 'action_scheduler_init', array( __CLASS__, 'ensure_recurring' ) );
 
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
-		add_filter( 'rest_authentication_errors', array( __CLASS__, 'allow_webhook' ), 1000 );
 		add_action( 'init', array( __CLASS__, 'short_link' ), 1 );
 	}
 
 	/** Recuperarea joburilor la 15 minute și raportul zilnic există mereu. */
 	public static function ensure_recurring(): void {
-		if ( ! self::has_scheduler() ) {
+		// Verificarea costă două interogări în tabela Action Scheduler: o facem cel mult o dată pe oră.
+		if ( ! self::has_scheduler() || (int) get_option( 'scp_sms_recurring_at' ) > time() - HOUR_IN_SECONDS ) {
 			return;
 		}
+		update_option( 'scp_sms_recurring_at', time(), true );
 		if ( ! as_has_scheduled_action( 'scp_sms_recover', array(), self::GROUP ) ) {
 			as_schedule_recurring_action( time() + 60, 15 * MINUTE_IN_SECONDS, 'scp_sms_recover', array(), self::GROUP );
 		}
@@ -129,15 +140,20 @@ class SCP_SMS {
 	/* ---------------------------------------------------------------- evenimente din programări */
 
 	private static function is_paid( array $b ): bool {
-		return in_array( $b['payment_status'], self::PAID_SET, true );
+		return SCP_Bookings::is_paid( $b );
+	}
+
+	/** Plătită sau confirmată cu plata la studio: primește confirmarea și reamintirile. */
+	private static function is_secured( array $b ): bool {
+		return SCP_Bookings::is_secured( $b );
 	}
 
 	public static function on_created( array $b ): void {
 		if ( 'cancelled' === $b['status'] ) {
 			return;
 		}
-		if ( self::is_paid( $b ) ) {
-			// voucher (sau plătită din admin): direct confirmarea și reamintirile
+		if ( self::is_secured( $b ) ) {
+			// voucher, plătită din admin sau cu plata la studio: direct confirmarea și reamintirile
 			self::on_paid( $b );
 			return;
 		}
@@ -165,9 +181,17 @@ class SCP_SMS {
 		$wpdb->query( $wpdb->prepare( 'UPDATE ' . self::table() . " SET status='cancelled', updated_at=%s WHERE booking_id=%d AND status IN ('scheduled','queued','retry')", SCP_Helpers::mysql_now(), $b['id'] ) ); // phpcs:ignore
 	}
 
-	public static function on_rescheduled( array $b, array $before ): void {
+	public static function on_rescheduled( array $b, array $before, bool $notify = false ): void {
 		self::unschedule_reminders( $b, self::slot_key( $before ) );
-		if ( ! self::is_paid( $b ) || 'cancelled' === $b['status'] ) {
+		// mutată din admin cu „Anunță clientul”: SMS cu noua oră, de fiecare dată când se mută
+		if ( $notify ) {
+			$row = self::row( (int) $b['id'], 'moved' );
+			if ( $row && $row['slot'] !== self::slot_key( $b ) && ! in_array( $row['status'], array( 'scheduled', 'queued', 'retry' ), true ) ) {
+				self::reset_row( $row, 'mutată din nou' );
+			}
+			self::queue( $b, 'moved' );
+		}
+		if ( ! self::is_secured( $b ) ) {
 			return;
 		}
 		// reamintirile pornesc din nou pentru noul slot; istoricul rămâne în rândul din jurnal
@@ -265,7 +289,7 @@ class SCP_SMS {
 		}
 		$t = self::get( 'templates' );
 		if ( 'paid' === $type ) {
-			return ! empty( $t['paid']['enabled'] ) || ! empty( $t['voucher']['enabled'] );
+			return ! empty( $t['paid']['enabled'] ) || ! empty( $t['voucher']['enabled'] ) || ! empty( $t['studio']['enabled'] );
 		}
 		return ! empty( $t[ $type ]['enabled'] );
 	}
@@ -411,7 +435,12 @@ class SCP_SMS {
 
 	public static function template_for( array $b, string $type ): string {
 		$t   = self::get( 'templates' );
-		$key = ( 'paid' === $type && 'voucher' === $b['payment_status'] ) ? 'voucher' : $type;
+		$key = $type;
+		if ( 'paid' === $type && 'voucher' === $b['payment_status'] ) {
+			$key = 'voucher';
+		} elseif ( 'paid' === $type && ! empty( $b['status'] ) && SCP_Bookings::pays_at_studio( $b ) ) {
+			$key = 'studio';
+		}
 		return (string) ( $t[ $key ]['body'] ?? '' );
 	}
 
@@ -467,15 +496,17 @@ class SCP_SMS {
 			$skip = 'SMS-urile sunt oprite';
 		} elseif ( 'cancelled' === $b['status'] ) {
 			$skip = 'Programarea e anulată';
+		} elseif ( ! SCP_Helpers::is_ro_mobile( (string) $b['phone'] ) ) {
+			$skip = 'Număr din afara României: SMS-urile automate pleacă doar pe +407…';
 		} elseif ( $slot && $slot !== self::slot_key( $b ) ) {
 			$skip = 'Programarea a fost mutată';
 		} elseif ( 'created' === $type && ( 'pending' !== $b['status'] || self::is_paid( $b ) ) ) {
 			$skip = 'Programarea nu mai așteaptă plata';
-		} elseif ( in_array( $type, array( 'paid', 'remind_day', 'remind_hour' ), true ) && ! self::is_paid( $b ) ) {
-			$skip = 'Programarea nu e plătită';
+		} elseif ( in_array( $type, array( 'paid', 'remind_day', 'remind_hour' ), true ) && ! self::is_secured( $b ) ) {
+			$skip = 'Programarea nu e plătită și nici confirmată cu plata la studio';
 		} elseif ( in_array( $type, array( 'remind_day', 'remind_hour' ), true ) && ! self::still_useful( $b, $type ) ) {
 			$skip = 'Ședința a trecut sau e prea aproape';
-		} elseif ( 'paid' === $type && SCP_Helpers::now() >= SCP_Helpers::dt( $b['slot_date'], $b['slot_time'] ) ) {
+		} elseif ( in_array( $type, array( 'paid', 'moved' ), true ) && SCP_Helpers::now() >= SCP_Helpers::dt( $b['slot_date'], $b['slot_time'] ) ) {
 			$skip = 'Ședința a trecut';
 		}
 		if ( $skip ) {
@@ -614,7 +645,7 @@ class SCP_SMS {
 		self::apply_status( $row, $st );
 		$row = self::row_by_id( (int) $log_id );
 		$age = $row['sent_at'] ? time() - ( new DateTimeImmutable( (string) $row['sent_at'], SCP_Helpers::tz() ) )->getTimestamp() : 0;
-		if ( ! in_array( $row['status'], array( 'delivered', 'undelivered', 'expired', 'error' ), true ) && $age < DAY_IN_SECONDS && self::has_scheduler() ) {
+		if ( ! in_array( $row['status'], array( 'delivered', 'undelivered', 'expired', 'error' ), true ) && $age < 3 * HOUR_IN_SECONDS && self::has_scheduler() ) {
 			as_schedule_single_action( time() + 30 * MINUTE_IN_SECONDS, 'scp_sms_check', array( (int) $log_id ), self::GROUP );
 		}
 	}
@@ -629,18 +660,6 @@ class SCP_SMS {
 				'permission_callback' => '__return_true',
 			)
 		);
-	}
-
-	/** Webhookul e public (vine de la SMSO), așa că îl lăsăm să treacă de blocarea REST pentru vizitatori. */
-	public static function allow_webhook( $result ) {
-		if ( ! is_wp_error( $result ) ) {
-			return $result;
-		}
-		$uri = (string) ( $_SERVER['REQUEST_URI'] ?? '' ); // phpcs:ignore
-		if ( str_contains( $uri, '/' . SCP_Rest::NS . '/sms/status' ) || str_contains( rawurldecode( $uri ), '/' . SCP_Rest::NS . '/sms/status' ) ) {
-			return null;
-		}
-		return $result;
 	}
 
 	public static function webhook( WP_REST_Request $request ) {
@@ -672,8 +691,11 @@ class SCP_SMS {
 		global $wpdb;
 		$from = SCP_Helpers::now()->format( 'Y-m-d' );
 		$to   = SCP_Helpers::now()->modify( '+3 days' )->format( 'Y-m-d' );
-		$list = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . SCP_Install::table( 'bookings' ) . " WHERE status <> 'cancelled' AND payment_status IN ('paid','cash','voucher') AND slot_date BETWEEN %s AND %s", $from, $to ), ARRAY_A ); // phpcs:ignore
+		$list = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . SCP_Install::table( 'bookings' ) . " WHERE status <> 'cancelled' AND slot_date BETWEEN %s AND %s", $from, $to ), ARRAY_A ); // phpcs:ignore
 		foreach ( (array) $list as $b ) {
+			if ( ! self::is_secured( $b ) ) {
+				continue;
+			}
 			foreach ( array( 'remind_day', 'remind_hour' ) as $type ) {
 				if ( ! self::template_on( $type ) || ! self::still_useful( $b, $type ) ) {
 					continue;
@@ -762,7 +784,7 @@ class SCP_SMS {
 	}
 
 	public static function type_label( string $t ): string {
-		$l = array( 'created' => 'Rezervare', 'paid' => 'Confirmare', 'remind_day' => 'Cu o zi înainte', 'remind_hour' => 'Cu o oră înainte' );
+		$l = array( 'created' => 'Rezervare', 'paid' => 'Confirmare', 'moved' => 'Mutare', 'remind_day' => 'Cu o zi înainte', 'remind_hour' => 'Cu o oră înainte' );
 		return $l[ $t ] ?? ( str_starts_with( $t, 'test-' ) ? 'Test livrare' : $t );
 	}
 
@@ -780,7 +802,7 @@ class SCP_SMS {
 				$r       = self::row( (int) $b['id'], $t );
 				$cells[] = $r ? self::status_label( $r['status'] ) . ( $r['backup_email_at'] ? ' + email' : '' ) : '–';
 			}
-			$pay   = SCP_Helpers::PAYMENT_STATUSES[ $b['payment_status'] ] ?? $b['payment_status'];
+			$pay   = SCP_Bookings::pays_at_studio( $b ) ? 'De încasat la studio' : ( SCP_Helpers::PAYMENT_STATUSES[ $b['payment_status'] ] ?? $b['payment_status'] );
 			$rows .= '<tr><td style="padding:6px 8px;border-bottom:1px solid #eee"><b>' . esc_html( $b['slot_time'] ) . '</b></td><td style="padding:6px 8px;border-bottom:1px solid #eee">' . esc_html( $b['name'] ) . '<br><small>' . esc_html( $b['phone'] ) . '</small></td><td style="padding:6px 8px;border-bottom:1px solid #eee">' . esc_html( $pk[ $b['package'] ]['label'] ?? $b['package'] ) . '</td><td style="padding:6px 8px;border-bottom:1px solid #eee">' . esc_html( is_array( $pay ) ? ( $pay['label'] ?? '' ) : $pay ) . '</td><td style="padding:6px 8px;border-bottom:1px solid #eee">' . implode( '</td><td style="padding:6px 8px;border-bottom:1px solid #eee">', array_map( 'esc_html', $cells ) ) . '</td></tr>';
 		}
 		$failed = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::table() . " WHERE status IN ('failed','undelivered','expired','error') AND booking_id > 0 AND updated_at > %s", SCP_Helpers::now()->modify( '-1 day' )->format( 'Y-m-d H:i:s' ) ) ); // phpcs:ignore
@@ -811,6 +833,15 @@ class SCP_SMS {
 		if ( ! preg_match( '#^/p/([a-f0-9]{10})/?$#', $path, $m ) ) {
 			return;
 		}
+		// Ghicitul linkurilor scurte: cel mult 30 pe oră de pe aceeași conexiune.
+		$rl = SCP_Helpers::rate_key( 'scp_pl_' );
+		$n  = (int) get_transient( $rl );
+		if ( $n >= 30 ) {
+			nocache_headers();
+			wp_safe_redirect( home_url( '/sedinte-foto-de-craciun/' ), 302, 'SC Programari' );
+			exit;
+		}
+		set_transient( $rl, $n + 1, HOUR_IN_SECONDS );
 		global $wpdb;
 		$token = $wpdb->get_var( $wpdb->prepare( 'SELECT token FROM ' . SCP_Install::table( 'bookings' ) . ' WHERE token LIKE %s LIMIT 2', $wpdb->esc_like( $m[1] ) . '%' ) ); // phpcs:ignore
 		$b     = $token ? SCP_Bookings::get_by_token( (string) $token ) : null;

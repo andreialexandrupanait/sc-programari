@@ -27,15 +27,22 @@ class SCP_WooCommerce {
 		add_action( 'wp', array( __CLASS__, 'configure_voucher_cart' ), 5 );
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'manual_price' ), 50 );
 		add_filter( 'woocommerce_coupon_is_valid', array( __CLASS__, 'guard_early_coupon' ), 20, 2 );
+		add_filter( 'woocommerce_coupon_is_valid_for_product', array( __CLASS__, 'no_coupons_on_vouchers' ), 20, 2 );
 		add_filter( 'woocommerce_checkout_get_value', array( __CLASS__, 'prefill' ), 20, 2 );
 		add_action( 'woocommerce_checkout_process', array( __CLASS__, 'validate_checkout' ) );
 		add_action( 'woocommerce_checkout_create_order', array( __CLASS__, 'attach_to_order' ), 20, 1 );
+		add_filter( 'woocommerce_checkout_fields', array( __CLASS__, 'gift_fields' ), 1000 );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_gift_fields' ), 20, 2 );
+		add_action( 'woocommerce_checkout_create_order', array( __CLASS__, 'save_gift_fields' ), 20, 2 );
+		add_action( 'woocommerce_admin_order_data_after_billing_address', array( __CLASS__, 'show_gift_fields' ) );
 		add_action( 'woocommerce_before_checkout_form', array( __CLASS__, 'notice' ), 5 );
 		add_action( 'cartflows_checkout_form_before', array( __CLASS__, 'notice' ), 5 ); // apare și când coșul e gol
 		add_action( 'wp_head', array( __CLASS__, 'lock_css' ) );
 		add_action( 'woocommerce_payment_complete', array( __CLASS__, 'on_paid' ), 20, 1 );
 		add_action( 'woocommerce_order_status_processing', array( __CLASS__, 'on_paid' ), 20, 1 );
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'on_paid' ), 20, 1 );
+		add_action( 'woocommerce_order_status_refunded', array( __CLASS__, 'on_refunded' ), 20, 1 );
+		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'on_refunded' ), 20, 1 );
 	}
 
 	/** Programarea din sesiunea curentă, dacă se mai poate plăti. */
@@ -54,7 +61,7 @@ class SCP_WooCommerce {
 	}
 
 	private static function payable( array $b ): bool {
-		return 'cancelled' !== $b['status'] && ! in_array( $b['payment_status'], array( 'paid', 'cash', 'voucher' ), true );
+		return 'cancelled' !== $b['status'] && ! in_array( $b['payment_status'], SCP_Helpers::PAID, true );
 	}
 
 	public static function capture_token(): void {
@@ -70,7 +77,7 @@ class SCP_WooCommerce {
 			WC()->session->set_customer_session_cookie( true );
 		}
 		WC()->session->set( 'scp_token', $token );
-		WC()->session->set( 'scp_state', self::payable( $b ) ? 'ok' : ( in_array( $b['payment_status'], array( 'paid', 'cash', 'voucher' ), true ) ? 'paid' : 'cancelled' ) );
+		WC()->session->set( 'scp_state', self::payable( $b ) ? 'ok' : ( in_array( $b['payment_status'], SCP_Helpers::PAID, true ) ? 'paid' : 'cancelled' ) );
 		self::$loaded = false;
 	}
 
@@ -100,6 +107,71 @@ class SCP_WooCommerce {
 			}
 		}
 		return false;
+	}
+
+	private static function cart_has_voucher(): bool {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return false;
+		}
+		$ids = array_filter( array_map( 'intval', (array) SCP_Settings::get( 'voucher_products', array() ) ) );
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( in_array( self::item_product_id( $item ), $ids, true ) || in_array( (int) ( $item['product_id'] ?? 0 ), $ids, true ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Checkout-ul voucherului: pentru cine e cadoul (opțional). Telefonul cumpărătorului vine din câmpul de facturare. */
+	public static function gift_fields( $fields ) {
+		if ( ! self::cart_has_voucher() || self::cart_has_booking_item() ) {
+			return $fields;
+		}
+		$types = array( 'recipient_name' => 'text', 'recipient_email' => 'email', 'recipient_phone' => 'tel' );
+		$prio  = 300;
+		foreach ( SCP_Vouchers::GIFT_FIELDS as $key => $label ) {
+			$fields['billing'][ 'scp_' . $key ] = array(
+				'type'     => $types[ $key ],
+				'label'    => $label,
+				'required' => false,
+				'class'    => array( 'form-row-wide', 'scp-gift-field' ),
+				'priority' => $prio++,
+			);
+		}
+		$fields['billing']['scp_recipient_name']['description'] = 'Dacă voucherul e cadou, scrie pentru cine e. Apare pe voucher.';
+		return $fields;
+	}
+
+	public static function validate_gift_fields( $data, $errors ): void {
+		$email = trim( (string) ( $data['scp_recipient_email'] ?? '' ) );
+		if ( '' !== $email && ! is_email( $email ) ) {
+			$errors->add( 'validation', 'Emailul celui care primește voucherul nu pare corect.' );
+		}
+	}
+
+	public static function save_gift_fields( $order, $data ): void {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		foreach ( SCP_Vouchers::GIFT_FIELDS as $key => $label ) {
+			$value = trim( (string) ( $data[ 'scp_' . $key ] ?? '' ) );
+			if ( '' !== $value ) {
+				$order->update_meta_data( '_scp_' . $key, 'recipient_email' === $key ? sanitize_email( $value ) : sanitize_text_field( $value ) );
+			}
+		}
+	}
+
+	public static function show_gift_fields( $order ): void {
+		$rows = array();
+		foreach ( array( 'recipient_name' => 'Nume', 'recipient_email' => 'Email', 'recipient_phone' => 'Telefon' ) as $key => $label ) {
+			$value = (string) $order->get_meta( '_scp_' . $key );
+			if ( '' !== $value ) {
+				$rows[] = esc_html( $label . ': ' . $value );
+			}
+		}
+		if ( $rows ) {
+			echo '<p><strong>Voucherul e pentru</strong><br>' . implode( '<br>', $rows ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
 	}
 
 	private static function item_product_id( ?array $item ): int {
@@ -251,6 +323,17 @@ class SCP_WooCommerce {
 		return $valid;
 	}
 
+	/** Voucherul cadou se vinde doar la prețul întreg: niciun cupon al magazinului nu se aplică pe el. */
+	public static function no_coupons_on_vouchers( $valid, $product ) {
+		if ( ! $valid || ! $product ) {
+			return $valid;
+		}
+		$ids = array_filter( array_map( 'intval', (array) SCP_Settings::get( 'voucher_products', array() ) ) );
+		$pid = (int) $product->get_id();
+		$par = (int) $product->get_parent_id();
+		return in_array( $pid, $ids, true ) || ( $par && in_array( $par, $ids, true ) ) ? false : $valid;
+	}
+
 	public static function prefill( $value, $input ) {
 		if ( null !== $value && '' !== $value ) {
 			return $value;
@@ -356,6 +439,33 @@ form.woocommerce-checkout,.wcf-embed-checkout-form form.checkout,.wcf-product-op
 	}
 
 	public static function on_paid( $order_id ): void {
+		try {
+			self::on_paid_inner( $order_id );
+		} catch ( \Throwable $e ) {
+			// O eroare a pluginului nu are voie să strice confirmarea plății (IPN Netopia).
+			self::log( 'Plata comenzii #' . $order_id . ': ' . $e->getMessage() );
+		}
+	}
+
+	public static function on_refunded( $order_id ): void {
+		try {
+			$order = wc_get_order( $order_id );
+			$id    = $order ? (int) $order->get_meta( '_scp_booking_id' ) : 0;
+			if ( $id ) {
+				SCP_Bookings::mark_refunded( $id, (int) $order->get_id(), 'refunded' === $order->get_status() ? 'rambursată' : 'anulată' );
+			}
+		} catch ( \Throwable $e ) {
+			self::log( 'Rambursarea comenzii #' . $order_id . ': ' . $e->getMessage() );
+		}
+	}
+
+	private static function log( string $msg ): void {
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->error( $msg, array( 'source' => 'sc-programari' ) );
+		}
+	}
+
+	private static function on_paid_inner( $order_id ): void {
 		$order = wc_get_order( $order_id );
 		if ( ! $order || ! $order->is_paid() ) {
 			return;
@@ -363,6 +473,10 @@ form.woocommerce-checkout,.wcf-embed-checkout-form form.checkout,.wcf-product-op
 		$id = (int) $order->get_meta( '_scp_booking_id' );
 		if ( ! $id ) {
 			return;
+		}
+		$b = SCP_Bookings::get( $id );
+		if ( $b && (float) $order->get_total() + 0.01 < (float) $b['price'] && 'paid' !== $b['payment_status'] ) {
+			SCP_Rest::alert_once( 'scp_alert_sum_' . $id, 'Plată mai mică decât prețul programării', 'Comanda #' . $order->get_id() . ' (' . $order->get_total() . ' lei) e mai mică decât prețul programării ' . $b['code'] . ' (' . SCP_Helpers::money( $b['price'] ) . ' lei). Programarea a fost marcată plătită; verifică diferența.' );
 		}
 		SCP_Bookings::mark_paid_online( $id, (int) $order->get_id() );
 		if ( function_exists( 'WC' ) && WC()->session ) {

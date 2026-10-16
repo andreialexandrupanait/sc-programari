@@ -45,7 +45,8 @@ class SCP_Settings {
 			'reply_to'           => '',
 			'payment_url'        => '/plata-craciun-2026/?scp={token}',
 			'webhook_url'        => '',
-			'webhook_secret'     => wp_generate_password( 40, false, false ),
+			'webhook_secret'     => '',
+			'sheet_key'          => '',
 			'webhook_events'     => array( 'booking.created', 'booking.updated', 'booking.cancelled', 'booking.payment_link_sent', 'booking.paid', 'voucher.issued' ),
 			'track_fbq'          => 0,
 			'pay_hours'                => 48,
@@ -72,6 +73,11 @@ class SCP_Settings {
 				'enabled' => 1,
 				'subject' => 'Ședința foto de Crăciun e programată: {ziua}, {data}, ora {ora}',
 				'body'    => "Bună, {nume}!\n\nTe așteptăm în studio {ziua}, {data}, la ora {ora}, pentru ședința foto de Crăciun ({pachet}).\n\nȘedința durează o oră, ca cei mici să aibă timp să se acomodeze cu decorurile și cu aparatul foto. Îți recomandăm să vină odihniți și hrăniți. Pentru ținute, alege culori deschise, uni; nu e nevoie să fie neapărat în tematica Crăciunului.\n\nDacă trebuie să muți sau să anulezi programarea, sună-ne la {telefon_studio}.\n\nCu drag,\n{studio}",
+			),
+			'client_studio'       => array(
+				'enabled' => 1,
+				'subject' => 'Ședința foto de Crăciun e programată: {ziua}, {data}, ora {ora}',
+				'body'    => "Bună, {nume}!\n\nTe așteptăm în studio {ziua}, {data}, la ora {ora}, pentru ședința foto de Crăciun ({pachet}).\n\nPlata ({pret} lei) se face la studio, cash sau cu cardul.\n\nȘedința durează o oră, ca cei mici să aibă timp să se acomodeze cu decorurile și cu aparatul foto. Îți recomandăm să vină odihniți și hrăniți. Pentru ținute, alege culori deschise, uni; nu e nevoie să fie neapărat în tematica Crăciunului.\n\nDacă trebuie să muți sau să anulezi programarea, sună-ne la {telefon_studio}.\n\nCu drag,\n{studio}",
 			),
 			'client_pending'      => array(
 				'enabled' => 1,
@@ -151,7 +157,7 @@ class SCP_Settings {
 	public static function update( array $values ): void {
 		$current = self::all();
 		$new     = array_merge( $current, $values );
-		update_option( self::OPTION, $new, false );
+		update_option( self::OPTION, $new, true ); // citită pe aproape orice pagină: autoload, fără interogare separată
 		self::$cache = null;
 	}
 

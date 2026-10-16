@@ -17,16 +17,52 @@ class SCP_Install {
 		self::create_tables();
 		self::add_caps();
 		if ( false === get_option( SCP_Settings::OPTION ) ) {
-			add_option( SCP_Settings::OPTION, SCP_Settings::defaults(), '', false );
+			add_option( SCP_Settings::OPTION, SCP_Settings::defaults(), '', true );
+		}
+		self::ensure_keys();
+		if ( ! wp_next_scheduled( 'scp_cleanup' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'scp_cleanup' );
 		}
 		if ( ! wp_next_scheduled( 'scp_webhook_retry' ) ) {
 			wp_schedule_event( time() + 300, 'scp_five_minutes', 'scp_webhook_retry' );
 		}
-		update_option( 'scp_db_version', SCP_DB_VERSION, false );
+		if ( self::schema_ok() ) {
+			// Autoload: se citește la fiecare cerere, deci fără interogare separată.
+			update_option( 'scp_db_version', SCP_DB_VERSION, true );
+		}
+	}
+
+	/** Cheile webhook se generează o singură dată (înainte, valoarea implicită se regenera la fiecare cerere). */
+	private static function ensure_keys(): void {
+		$s   = SCP_Settings::all();
+		$set = array();
+		if ( strlen( (string) ( $s['webhook_secret'] ?? '' ) ) < 16 ) {
+			$set['webhook_secret'] = wp_generate_password( 40, false, false );
+		}
+		if ( strlen( (string) ( $s['sheet_key'] ?? '' ) ) < 16 || ( $s['sheet_key'] ?? '' ) === ( $set['webhook_secret'] ?? $s['webhook_secret'] ) ) {
+			$set['sheet_key'] = wp_generate_password( 40, false, false );
+		}
+		if ( $set ) {
+			SCP_Settings::update( $set );
+		}
+	}
+
+	/** Coloanele adăugate în versiunile recente există? Altfel versiunea bazei de date nu crește și upgrade-ul se reia. */
+	private static function schema_ok(): bool {
+		global $wpdb;
+		$v = (array) $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::table( 'vouchers' ) ); // phpcs:ignore
+		$b = (array) $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::table( 'bookings' ) ); // phpcs:ignore
+		return ! array_diff( array( 'code_norm', 'recipient_name', 'buyer_phone' ), $v ) && in_array( 'meta', $b, true );
 	}
 
 	public static function deactivate(): void {
 		wp_clear_scheduled_hook( 'scp_webhook_retry' );
+		wp_clear_scheduled_hook( 'scp_cleanup' );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( '', array(), 'scp-sms' );
+			as_unschedule_all_actions( '', array(), 'scp' );
+		}
+		delete_option( 'scp_sms_recurring_at' );
 	}
 
 	public static function maybe_upgrade(): void {
@@ -34,7 +70,16 @@ class SCP_Install {
 		if ( $from === SCP_DB_VERSION ) {
 			return;
 		}
+		// Primele cereri după un update ar rula toate dbDelta deodată: doar una o face (add_option e atomic).
+		if ( ! add_option( 'scp_upgrade_lock', time(), '', false ) ) {
+			if ( (int) get_option( 'scp_upgrade_lock' ) > time() - 60 ) {
+				return;
+			}
+			update_option( 'scp_upgrade_lock', time(), false );
+		}
 		self::activate();
+		self::upgrade_data( $from );
+		delete_option( 'scp_upgrade_lock' );
 		$saved = get_option( SCP_Settings::OPTION );
 		if ( is_array( $saved ) && $from && version_compare( $from, '3', '<' ) ) {
 			$events = (array) ( $saved['webhook_events'] ?? array() );
@@ -43,6 +88,20 @@ class SCP_Install {
 				$saved['webhook_events'] = $events;
 				update_option( SCP_Settings::OPTION, $saved, false );
 				SCP_Settings::flush();
+			}
+		}
+	}
+
+	private static function upgrade_data( string $from ): void {
+		global $wpdb;
+		if ( $from && version_compare( $from, '7', '<' ) ) {
+			// Căutarea voucherelor folosește coloana normalizată (cu index), nu REPLACE() pe toată tabela.
+			$wpdb->query( 'UPDATE ' . self::table( 'vouchers' ) . " SET code_norm = UPPER(REPLACE(code, '-', '')) WHERE code_norm = ''" ); // phpcs:ignore
+			// Setările se citesc pe aproape orice pagină: autoload.
+			foreach ( array( SCP_Settings::OPTION, 'scp_sms_settings' ) as $opt ) {
+				if ( function_exists( 'wp_set_option_autoload' ) && false !== get_option( $opt ) ) {
+					wp_set_option_autoload( $opt, true );
+				}
 			}
 		}
 	}
@@ -139,6 +198,11 @@ class SCP_Install {
   order_item_id bigint(20) unsigned NULL,
   buyer_name varchar(190) NOT NULL DEFAULT '',
   buyer_email varchar(190) NOT NULL DEFAULT '',
+  buyer_phone varchar(40) NOT NULL DEFAULT '',
+  recipient_name varchar(190) NOT NULL DEFAULT '',
+  recipient_email varchar(190) NOT NULL DEFAULT '',
+  recipient_phone varchar(40) NOT NULL DEFAULT '',
+  code_norm varchar(32) NOT NULL DEFAULT '',
   note varchar(190) NOT NULL DEFAULT '',
   booking_id bigint(20) unsigned NULL,
   expires_on date NULL,
@@ -148,7 +212,8 @@ class SCP_Install {
   UNIQUE KEY code (code),
   KEY status (status),
   KEY order_id (order_id),
-  KEY booking_id (booking_id)
+  KEY booking_id (booking_id),
+  KEY code_norm (code_norm)
 ) {$charset};"
 		);
 
@@ -180,7 +245,8 @@ class SCP_Install {
   PRIMARY KEY  (id),
   UNIQUE KEY booking_type (booking_id,type),
   KEY provider_id (provider_id),
-  KEY status (status)
+  KEY status (status),
+  KEY updated_at (updated_at)
 ) {$charset};"
 		);
 
@@ -201,7 +267,7 @@ class SCP_Install {
   next_attempt_at datetime NULL,
   delivered_at datetime NULL,
   PRIMARY KEY  (id),
-  KEY status (status),
+  KEY status_next (status,next_attempt_at),
   KEY booking_id (booking_id)
 ) {$charset};"
 		);

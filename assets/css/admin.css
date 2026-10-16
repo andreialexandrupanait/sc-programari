@@ -71,7 +71,7 @@
 .scp-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #eeeae2; color: #5e584c; white-space: nowrap; }
 .scp-badge--pay-unpaid { background: #f3efe6; color: #7a705d; }
 .scp-badge--pay-link_sent { background: var(--blue-soft); color: var(--blue); }
-.scp-badge--pay-paid, .scp-badge--pay-cash { background: var(--g-soft); color: var(--g); }
+.scp-badge--pay-paid, .scp-badge--pay-cash, .scp-badge--pay-card { background: var(--g-soft); color: var(--g); }
 .scp-badge--status-confirmed { background: var(--g-soft); color: var(--g); }
 .scp-badge--status-completed { background: #eeeae2; color: #4a463e; }
 .scp-badge--status-no_show { background: var(--gold-soft); color: #8a6a22; }
@@ -126,6 +126,10 @@
 .scp-copy { display: flex; gap: 6px; margin-bottom: 10px; }
 .scp-copy input { flex: 1; min-width: 0; }
 .scp-inline-form { margin: 0 0 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.scp-collect { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 8px; }
+.scp-collect > span { font-weight: 600; margin-right: 2px; }
+.scp-collect .scp-inline-form { margin: 0; }
+.scp-badge--studio { background: var(--gold-soft); color: #8a6a22; }
 .scp-inline-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #50575e; }
 .scp-admin .button.scp-danger { color: var(--red); border-color: #e3b9ae; }
 .scp-admin .button.scp-danger:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
@@ -177,6 +181,13 @@
 .scp-cell--booked.is-plus { box-shadow: inset 4px 0 0 var(--gold); }
 .scp-cell--booked.pay-unpaid .scp-cell-meta::after { content: ""; }
 .scp-cell--booked:hover { border-color: var(--g-deep); background: var(--g-deep); }
+/* Neplătite: așteaptă plata online (auriu) sau plata la studio (verde deschis). */
+.scp-cell--booked.pay-awaiting { background: var(--gold-soft); border-color: var(--gold); color: #5e4612; }
+.scp-cell--booked.pay-awaiting .scp-cell-meta { color: #8a6a22; }
+.scp-cell--booked.pay-studio, .scp-cell--booked.pay-unpaid { background: var(--g-soft); border-color: #b9cfae; color: var(--g-deep); }
+.scp-cell--booked.pay-studio .scp-cell-meta, .scp-cell--booked.pay-unpaid .scp-cell-meta { color: var(--g); }
+.scp-cell--booked.pay-awaiting:hover, .scp-cell--booked.pay-studio:hover, .scp-cell--booked.pay-unpaid:hover { color: #fff; }
+.scp-cell--booked.pay-awaiting:hover .scp-cell-meta, .scp-cell--booked.pay-studio:hover .scp-cell-meta { color: #cfe0c7; }
 .scp-cell--blocked { background: repeating-linear-gradient(135deg, #f6f2ea 0 6px, #ece5d7 6px 12px); border-color: #e2dacb; }
 .scp-cell--blocked .scp-cell-meta { color: #776f60; }
 .scp-cell--past { background: #f6f4f0; border-color: #efebe4; }
@@ -255,3 +266,148 @@
 .scp-map-label { display: inline-block; min-width: 190px; font-weight: 600; }
 @media (max-width: 1100px) { .scp-grid-2--wide { grid-template-columns: 1fr; } }
 .scp-table .scp-mono { white-space: nowrap; }
+
+/* ---------- Stare plată (o singură etichetă) ---------- */
+.scp-badge--ps-paid { background: var(--g-soft); color: var(--g); }
+.scp-badge--ps-studio { background: #eef3ea; color: #3c6a2b; box-shadow: inset 0 0 0 1px #c9dbbf; }
+.scp-badge--ps-awaiting { background: var(--gold-soft); color: #7a5a17; }
+.scp-badge--ps-unpaid, .scp-badge--ps-none { background: #f3efe6; color: #7a705d; }
+
+/* ---------- Panou ---------- */
+.scp-agenda-day { margin: 14px 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.scp-agenda-day:first-of-type { margin-top: 0; }
+.scp-mini li { display: flex; align-items: center; gap: 8px; }
+.scp-mini li > a:first-child { flex: 1; min-width: 0; }
+.scp-collect-btns { display: flex; gap: 4px; flex: none; }
+.scp-collect-btns .button { min-height: 32px; }
+.scp-mini-call { flex: none; font-size: 12.5px; font-weight: 600; text-decoration: none; padding: 4px 8px; border-radius: 6px; color: var(--g); }
+.scp-mini-call:hover { background: var(--sand); }
+.scp-h2-link { float: right; font-size: 12.5px; font-weight: 500; text-decoration: none; }
+.scp-stats > summary { cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink); list-style-position: inside; }
+.scp-stats[open] > summary { margin-bottom: 14px; }
+.scp-stats h3 { font-size: 13px; margin: 0 0 6px; }
+@media (max-width: 782px) {
+	.scp-mini li { flex-wrap: wrap; }
+	.scp-mini-call { margin-left: 56px; }
+}
+
+/* ---------- Lista: vederi + căutare ---------- */
+.scp-views { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+.scp-views a { padding: 7px 12px; border-radius: 20px; background: #fff; border: 1px solid var(--line); text-decoration: none; color: var(--ink); font-weight: 500; }
+.scp-views a:hover { border-color: var(--g); color: var(--g); }
+.scp-views a.is-on { background: var(--g); border-color: var(--g); color: #fff; }
+.scp-filters { align-items: center; }
+.scp-filter-search { flex: 1 1 280px; }
+.scp-filter-search input[type="search"] { width: 100%; min-width: 0; min-height: 36px; }
+.scp-more-filters { flex-basis: 100%; }
+.scp-more-filters > summary { cursor: pointer; color: var(--g); font-weight: 600; font-size: 13px; }
+.scp-more-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 10px; }
+.scp-more-actions { display: flex; gap: 10px; align-items: center; }
+.scp-table td small { display: block; }
+@media (max-width: 782px) {
+	.scp-views { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+	.scp-views a { flex: none; }
+}
+
+/* ---------- Sincronizare Sheet ---------- */
+.scp-sync-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.scp-sync-dl { display: grid; grid-template-columns: 180px 1fr; gap: 8px 12px; margin: 0; }
+.scp-sync-dl dt { color: var(--muted); }
+.scp-sync-dl dd { margin: 0; word-break: break-all; }
+.scp-sync-more { margin-top: 14px; }
+.scp-sync-more summary { cursor: pointer; color: var(--g); font-weight: 600; }
+.scp-h2 { font-size: 15px; margin: 8px 0 10px; }
+.scp-h2 small { font-weight: 400; color: var(--muted); }
+@media (max-width: 960px) { .scp-sync-grid { grid-template-columns: 1fr; } .scp-sync-dl { grid-template-columns: 1fr; } }
+
+/* Calendar: coloane egale pentru ore. */
+.scp-cal-table { table-layout: fixed; }
+.scp-cal-table thead th.scp-cal-dayh { width: 200px; }
+.scp-cal-table thead th:last-child { width: 64px; }
+.scp-lg--studio::before { background: var(--g-soft); border-color: #b9cfae; }
+.scp-lg--awaiting::before { background: var(--gold-soft); border-color: var(--gold); }
+
+/* Telefon: nimic nu iese din ecran; în liste, eticheta și butoanele trec pe rândul doi. */
+@media (max-width: 782px) {
+	.wrap.scp-admin { padding: 0 8px; }
+	.scp-grid-2, .scp-kpis, .scp-edit { grid-template-columns: minmax(0, 1fr); }
+	.scp-panel { min-width: 0; padding: 14px; }
+	.scp-mini li > a:first-child { flex: 1 1 100%; flex-wrap: wrap; row-gap: 4px; }
+	.scp-mini a .scp-badge { margin-left: 60px; }
+	.scp-mini-main { flex: 1 1 calc(100% - 70px); }
+	.scp-mini-main span { white-space: normal; }
+	.scp-collect-btns { margin-left: 60px; }
+	.scp-collect-btns .button { min-height: 40px; min-width: 72px; }
+	.scp-mini-call { margin-left: 60px; padding-left: 0; }
+	.scp-panel--flush { overflow-x: auto; }
+}
+@media (max-width: 782px) {
+	.scp-admin input.regular-text, .scp-admin input.large-text, .scp-admin textarea.large-text { width: 100%; max-width: 100%; }
+	.scp-admin p, .scp-admin label, .scp-admin td { overflow-wrap: anywhere; }
+	.scp-admin p > input, .scp-admin p > label { max-width: 100%; }
+}
+@media (max-width: 782px) { .scp-smslog { display: block; overflow-x: auto; } }
+/* Telefon: în fișă, rezumatul și acțiunile vin primele. */
+@media (max-width: 1100px) { .scp-edit-side { order: -1; } }
+
+/* Calendar: grila în stânga, panoul cu detalii în dreapta */
+.scp-admin.scp-admin--wide { max-width: none; }
+.scp-cal-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.scp-cal-admin.has-side .scp-cal-layout { grid-template-columns: minmax(0, 1fr) 340px; }
+.scp-cal-admin:not(.has-side) .scp-cal-side { display: none; }
+.scp-cal-table { min-width: 860px; }
+.scp-cal-table thead th.scp-cal-dayh { width: 128px; }
+.scp-cal-day { width: 128px; white-space: normal; padding-right: 30px !important; }
+.scp-cal-table thead th:last-child { width: 52px; }
+.scp-cell { min-height: 84px; justify-content: flex-start; gap: 1px; padding: 7px 9px; }
+.scp-cell-name { max-width: none; font-size: 13px; line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.scp-cell-line { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .92; }
+.scp-cell-meta { margin-top: auto; }
+.scp-cell--free, .scp-cell--blocked, .scp-cell--past { justify-content: center; }
+.scp-cell.is-selected { outline: 3px solid var(--gold); outline-offset: 1px; }
+.scp-cal-side { box-sizing: border-box; position: sticky; top: 46px; max-height: calc(100vh - 62px); overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 18px; font-size: 13px; }
+.scp-cal-backdrop { display: none; }
+.scp-side-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.scp-side-when { margin: 2px 0 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.scp-side-close { border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 2px; }
+.scp-side-close:hover { color: var(--ink); }
+.scp-side-empty { color: var(--muted); margin: 6px 0 0; }
+.scp-side-name { margin: 2px 0 8px !important; font-size: 19px !important; color: var(--ink); }
+.scp-side-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.scp-side-badges .scp-badge { white-space: normal; }
+.scp-side-contact { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--sand); border-radius: 8px; margin-bottom: 12px; }
+.scp-side-phone { font-size: 18px; font-weight: 700; color: var(--g); text-decoration: none; }
+.scp-side-email { color: var(--ink); word-break: break-all; }
+.scp-side-dl { margin: 0 0 14px; }
+.scp-side-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0ece4; }
+.scp-side-row dt { color: var(--muted); }
+.scp-side-row dd { margin: 0; white-space: pre-line; word-break: break-word; }
+.scp-side-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.scp-side-wide { width: 100%; text-align: center; justify-content: center; }
+.scp-admin .scp-side-actions .button, .scp-admin .scp-cal-side .button { min-height: 36px; line-height: 34px; }
+.scp-side-collect { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.scp-side-collect span { color: var(--muted); margin-right: 2px; }
+.scp-side-collect .button { flex: 1; text-align: center; }
+.scp-side-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fbfaf7; }
+.scp-side-box--danger { border-color: #e9c3b9; background: var(--red-soft); margin-top: 8px; }
+.scp-side-box p { margin: 0 0 6px; }
+.scp-side-label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 6px 0 4px !important; }
+.scp-side-state { font-size: 14px; margin: 4px 0 12px; }
+.scp-side-sec { margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0ece4; }
+.scp-side-times { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.scp-side-time { border: 1px solid var(--g); color: var(--g); background: #fff; border-radius: 6px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+.scp-side-time:hover, .scp-side-time.is-on { background: var(--g); color: #fff; }
+.scp-side-check { display: flex; gap: 6px; align-items: flex-start; margin: 4px 0 10px; }
+.scp-side-check input { margin-top: 2px; }
+.scp-side-note { font-size: 12px; color: var(--muted); margin: 8px 0 0 !important; }
+.scp-danger-btn { color: #fff !important; background: var(--red) !important; border-color: var(--red) !important; }
+.scp-err { color: var(--red); }
+
+@media (max-width: 1100px) {
+	.scp-cal-layout, .scp-cal-admin.has-side .scp-cal-layout { display: block; }
+	.scp-cal-admin:not(.has-side) .scp-cal-side { display: block; }
+	.scp-cal-side { position: fixed; z-index: 100001; top: 0; right: 0; bottom: 0; width: min(420px, 100%); max-height: none; border-radius: 0; border-width: 0 0 0 1px; box-shadow: -12px 0 32px rgba(30, 25, 15, .18); transform: translateX(105%); transition: transform .2s ease; padding-top: 18px; }
+	.scp-cal-admin.has-side .scp-cal-side { transform: none; }
+	.scp-cal-admin.has-side .scp-cal-backdrop { display: block; position: fixed; inset: 0; z-index: 100000; background: rgba(20, 18, 12, .35); }
+	.scp-side-close { font-size: 28px; }
+}

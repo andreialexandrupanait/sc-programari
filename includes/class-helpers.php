@@ -18,9 +18,18 @@ class SCP_Helpers {
 		'unpaid'    => 'Neplătită',
 		'link_sent' => 'Link trimis',
 		'paid'      => 'Plătită online',
-		'cash'      => 'Plătită la studio',
+		'cash'      => 'Plătită cash la studio',
+		'card'      => 'Plătită cu cardul la studio',
 		'voucher'   => 'Plătită cu voucher',
 	);
+
+	/** Statusurile de plată care înseamnă că ședința e achitată. */
+	const PAID = array( 'paid', 'cash', 'card', 'voucher' );
+
+	/** Pentru SQL: 'paid','cash','card','voucher' (valori fixe, nu vin de la utilizator). */
+	public static function paid_sql(): string {
+		return "'" . implode( "','", self::PAID ) . "'";
+	}
 
 	const SOURCES = array(
 		'online' => 'Site',
@@ -125,15 +134,75 @@ class SCP_Helpers {
 		return wp_generate_uuid4();
 	}
 
+	/** Rețelele Cloudflare (https://www.cloudflare.com/ips/). Doar de la ele acceptăm antetul CF-Connecting-IP. */
+	const CLOUDFLARE = array(
+		'173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
+		'190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+		'104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+		'2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+	);
+
+	/**
+	 * IP-ul vizitatorului. CF-Connecting-IP contează doar când cererea vine de la Cloudflare sau de la un proxy
+	 * local al serverului (IP privat); altfel oricine l-ar putea trimite ca să ocolească limitele.
+	 */
 	public static function client_ip(): string {
-		foreach ( array( 'HTTP_CF_CONNECTING_IP', 'REMOTE_ADDR' ) as $k ) {
-			if ( ! empty( $_SERVER[ $k ] ) ) {
-				$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $k ] ) ) )[0] );
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
+		$remote = trim( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
+		if ( ! filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+			$remote = '0.0.0.0';
+		}
+		$cf = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ? trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) )[0] ) : ''; // phpcs:ignore
+		if ( $cf && filter_var( $cf, FILTER_VALIDATE_IP ) && self::trusted_proxy( $remote ) ) {
+			return $cf;
+		}
+		return $remote;
+	}
+
+	public static function trusted_proxy( string $ip ): bool {
+		// IP privat sau local: un proxy al gazdei în fața PHP-ului.
+		if ( filter_var( $ip, FILTER_VALIDATE_IP ) && ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
+			return true;
+		}
+		foreach ( (array) apply_filters( 'scp_trusted_proxies', self::CLOUDFLARE ) as $cidr ) {
+			if ( self::ip_in_range( $ip, (string) $cidr ) ) {
+				return true;
 			}
 		}
-		return '0.0.0.0';
+		return false;
+	}
+
+	public static function ip_in_range( string $ip, string $cidr ): bool {
+		[ $net, $bits ] = array_pad( explode( '/', $cidr, 2 ), 2, null );
+		$a = @inet_pton( $ip ); // phpcs:ignore
+		$b = @inet_pton( (string) $net ); // phpcs:ignore
+		if ( false === $a || false === $b || strlen( $a ) !== strlen( $b ) ) {
+			return false;
+		}
+		$bits  = null === $bits ? strlen( $a ) * 8 : (int) $bits;
+		$bytes = intdiv( $bits, 8 );
+		if ( substr( $a, 0, $bytes ) !== substr( $b, 0, $bytes ) ) {
+			return false;
+		}
+		$rest = $bits % 8;
+		if ( ! $rest ) {
+			return true;
+		}
+		$mask = chr( ( 0xff << ( 8 - $rest ) ) & 0xff );
+		return ( $a[ $bytes ] & $mask ) === ( $b[ $bytes ] & $mask );
+	}
+
+	/** Cheia pentru limitele pe conexiune: IPv4 întreg, IPv6 pe /64 (o conexiune are de obicei tot blocul). */
+	public static function rate_key( string $prefix ): string {
+		$ip = self::client_ip();
+		if ( str_contains( $ip, ':' ) ) {
+			$bin = @inet_pton( $ip ); // phpcs:ignore
+			$ip  = false !== $bin ? bin2hex( substr( $bin, 0, 8 ) ) . '::/64' : $ip;
+		}
+		return $prefix . md5( $ip . wp_salt( 'nonce' ) );
+	}
+
+	/** Mobil românesc (+407xxxxxxxx): doar pe acestea pleacă SMS-uri automate. */
+	public static function is_ro_mobile( string $raw ): bool {
+		return (bool) preg_match( '/^\+407\d{8}$/', SCP_SMS::e164( $raw ) );
 	}
 }

@@ -31,7 +31,7 @@ class SCP_Availability {
 		global $wpdb;
 		$table = SCP_Install::table( 'bookings' );
 		$rows  = $wpdb->get_results(
-			$wpdb->prepare( "SELECT id, code, slot_date, slot_time, name, phone, package, payment_status, status, source FROM {$table} WHERE active_slot IS NOT NULL AND slot_date BETWEEN %s AND %s", $from, $to ),
+			$wpdb->prepare( "SELECT id, code, slot_date, slot_time, name, phone, email, package, payment_status, status, source, pay_by, meta FROM {$table} WHERE active_slot IS NOT NULL AND slot_date BETWEEN %s AND %s", $from, $to ),
 			ARRAY_A
 		);
 		$out = array();

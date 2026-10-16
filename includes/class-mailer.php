@@ -6,12 +6,48 @@ defined( 'ABSPATH' ) || exit;
  */
 class SCP_Mailer {
 
+	const JOBS = array( 'on_created', 'on_rescheduled', 'on_cancelled', 'on_paid', 'on_studio', 'on_reminder' );
+
 	public static function init(): void {
-		add_action( 'scp_booking_created', array( __CLASS__, 'on_created' ), 20 );
-		add_action( 'scp_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ), 20, 3 );
-		add_action( 'scp_booking_cancelled', array( __CLASS__, 'on_cancelled' ), 20, 3 );
-		add_action( 'scp_booking_paid', array( __CLASS__, 'on_paid' ), 20 );
-		add_action( 'scp_payment_reminder', array( __CLASS__, 'on_reminder' ), 20 );
+		add_action( 'scp_booking_created', static fn( $b ) => self::defer( 'on_created', $b ), 20 );
+		add_action( 'scp_booking_rescheduled', static fn( $b, $before, $notify ) => self::defer( 'on_rescheduled', $b, array( (bool) $notify ) ), 20, 3 );
+		add_action( 'scp_booking_cancelled', static fn( $b, $notify, $reason = '' ) => self::defer( 'on_cancelled', $b, array( (bool) $notify, (string) $reason ) ), 20, 3 );
+		add_action( 'scp_booking_paid', static fn( $b ) => self::defer( 'on_paid', $b ), 20 );
+		add_action( 'scp_booking_studio', static fn( $b ) => self::defer( 'on_studio', $b ), 20 );
+		add_action( 'scp_payment_reminder', static fn( $b ) => self::defer( 'on_reminder', $b ), 20 );
+		add_action( 'scp_mail_job', array( __CLASS__, 'run_job' ), 10, 3 );
+	}
+
+	/**
+	 * Emailurile pleacă în fundal (Action Scheduler), ca formularul, plata (IPN Netopia) și adminul
+	 * să nu aștepte serverul de email. Fără Action Scheduler se trimit pe loc.
+	 */
+	private static function defer( string $job, array $b, array $args = array() ): void {
+		if ( empty( $b['id'] ) || ! function_exists( 'as_enqueue_async_action' ) || ! apply_filters( 'scp_async', true ) ) {
+			self::call( $job, $b, $args );
+			return;
+		}
+		as_enqueue_async_action( 'scp_mail_job', array( $job, (int) $b['id'], $args ), 'scp' );
+	}
+
+	public static function run_job( $job, $id, $args = array() ): void {
+		$b = SCP_Bookings::get( (int) $id );
+		if ( $b && in_array( $job, self::JOBS, true ) ) {
+			self::call( (string) $job, $b, (array) $args );
+		}
+	}
+
+	private static function call( string $job, array $b, array $args ): void {
+		switch ( $job ) {
+			case 'on_rescheduled':
+				self::on_rescheduled( $b, $b, (bool) ( $args[0] ?? false ) );
+				break;
+			case 'on_cancelled':
+				self::on_cancelled( $b, (bool) ( $args[0] ?? false ), (string) ( $args[1] ?? '' ) );
+				break;
+			default:
+				self::$job( $b );
+		}
 	}
 
 	private static function pay_button( array $b ): array {
@@ -27,12 +63,24 @@ class SCP_Mailer {
 					SCP_Bookings::mark_link_sent( $b['id'] );
 				}
 			} else {
-				self::send_template( 'client_confirmation', $b, $b['email'], array( 'ics' => true ) );
+				self::send_template( self::confirmation_key( $b ), $b, $b['email'], array( 'ics' => true ) );
 			}
 		}
 		$admins = SCP_Settings::admin_emails();
 		if ( $admins ) {
 			self::send_template( 'admin_new', $b, $admins, array( 'admin' => true, 'reply_to' => $b['email'] ) );
+		}
+	}
+
+	/** Confirmarea potrivită: cu plata la studio sau simplă. */
+	private static function confirmation_key( array $b ): string {
+		return SCP_Bookings::pays_at_studio( $b ) ? 'client_studio' : 'client_confirmation';
+	}
+
+	/** Programare trecută din „așteaptă plata online” pe plata la studio. */
+	public static function on_studio( array $b ): void {
+		if ( $b['email'] ) {
+			self::send_template( 'client_studio', $b, $b['email'], array( 'ics' => true ) );
 		}
 	}
 
@@ -49,7 +97,7 @@ class SCP_Mailer {
 	}
 
 	public static function on_paid( array $b ): void {
-		if ( $b['email'] && 'paid' === $b['payment_status'] ) {
+		if ( $b['email'] && 'paid' === $b['payment_status'] && 'cancelled' !== $b['status'] ) {
 			self::send_template( 'payment_received', $b, $b['email'], array( 'ics' => true ) );
 		}
 	}
@@ -99,6 +147,7 @@ class SCP_Mailer {
 		foreach ( $vouchers as $v ) {
 			$codes .= '<tr><td style="padding:14px 18px;border-bottom:1px solid #ece4d4;">'
 				. '<div style="font-family:\'Courier New\',monospace;font-size:24px;font-weight:700;letter-spacing:.12em;color:#1f3a17;">' . esc_html( $v['code'] ) . '</div>'
+				. ( ! empty( $v['recipient_name'] ) ? '<div style="margin-top:6px;font-size:16px;color:#3d3a35;">Pentru: <strong>' . esc_html( $v['recipient_name'] ) . '</strong></div>' : '' )
 				. '<div style="margin-top:4px;font-size:14px;color:#8a8170;">' . esc_html( ( $packages[ $v['package'] ]['label'] ?? $v['package'] ) . ' · valabil până pe ' . SCP_Helpers::date_ro( (string) $v['expires_on'] ) ) . '</div></td></tr>';
 		}
 		$body_html = $body;
@@ -119,7 +168,7 @@ class SCP_Mailer {
 		if ( 'pending' === $b['status'] ) {
 			return self::send_template( 'client_pending', $b, $b['email'], array( 'button' => self::pay_button( $b ), 'force' => true ) );
 		}
-		$key = 'paid' === $b['payment_status'] ? 'payment_received' : 'client_confirmation';
+		$key = 'paid' === $b['payment_status'] ? 'payment_received' : self::confirmation_key( $b );
 		return self::send_template( $key, $b, $b['email'], array( 'ics' => true, 'force' => true ) );
 	}
 

@@ -39,6 +39,96 @@ class SCP_Bookings {
 		return $row;
 	}
 
+	/** Plătită (online, cash, card sau voucher). */
+	public static function is_paid( array $b ): bool {
+		return in_array( $b['payment_status'], SCP_Helpers::PAID, true );
+	}
+
+	/** Confirmată cu plata la studio (cash sau card), încă neîncasată. */
+	public static function pays_at_studio( array $b ): bool {
+		$meta = is_array( $b['meta'] ?? null ) ? $b['meta'] : (array) json_decode( (string) ( $b['meta'] ?? '' ), true );
+		return 'studio' === ( $meta['pay_at'] ?? '' ) && 'confirmed' === $b['status'] && ! self::is_paid( $b );
+	}
+
+	/** Ședința e sigură: plătită sau confirmată cu plata la studio. Primește confirmarea și reamintirile. */
+	public static function is_secured( array $b ): bool {
+		return 'cancelled' !== $b['status'] && ( self::is_paid( $b ) || self::pays_at_studio( $b ) );
+	}
+
+	/**
+	 * Starea plății pe înțelesul tuturor, folosită peste tot în admin și în Sheet.
+	 *
+	 * @return array{key:string,label:string,short:string}
+	 */
+	public static function pay_state( array $b ): array {
+		$map = array(
+			'paid'    => array( 'paid', 'Plătită online', 'Plătită online' ),
+			'cash'    => array( 'paid', 'Plătită cash la studio', 'Plătită cash' ),
+			'card'    => array( 'paid', 'Plătită cu cardul la studio', 'Plătită card' ),
+			'voucher' => array( 'paid', 'Plătită cu voucher', 'Voucher' ),
+		);
+		if ( isset( $map[ $b['payment_status'] ] ) ) {
+			[ $key, $label, $short ] = $map[ $b['payment_status'] ];
+		} elseif ( 'cancelled' === $b['status'] ) {
+			[ $key, $label, $short ] = array( 'none', 'Neplătită', 'Neplătită' );
+		} elseif ( 'pending' === $b['status'] ) {
+			$until = $b['pay_by'] ? ( new DateTimeImmutable( $b['pay_by'], SCP_Helpers::tz() ) )->format( 'd.m H:i' ) : '';
+			[ $key, $label, $short ] = array( 'awaiting', 'Așteaptă plata online' . ( $until ? ' până pe ' . $until : '' ), 'Așteaptă plata' . ( $until ? ' · ' . $until : '' ) );
+		} elseif ( self::pays_at_studio( $b ) ) {
+			[ $key, $label, $short ] = array( 'studio', 'Plată la studio (cash sau card)', 'Plată la studio' );
+		} else {
+			[ $key, $label, $short ] = array( 'unpaid', 'Neplătită', 'Neplătită' );
+		}
+		return array( 'key' => $key, 'label' => $label, 'short' => $short );
+	}
+
+	/**
+	 * Trece o programare care așteaptă plata online pe plata la studio:
+	 * se confirmă, termenul dispare și nu mai expiră.
+	 *
+	 * @return array|WP_Error
+	 */
+	public static function move_to_studio( int $id ) {
+		$b = self::get( $id );
+		if ( ! $b ) {
+			return new WP_Error( 'scp_not_found', 'Programarea nu există.', array( 'status' => 404 ) );
+		}
+		if ( 'cancelled' === $b['status'] || self::is_paid( $b ) ) {
+			return new WP_Error( 'scp_invalid', 'Programarea e anulată sau deja plătită.', array( 'status' => 422 ) );
+		}
+		$after = self::update(
+			$id,
+			array(
+				'status'  => 'confirmed',
+				'pay_by'  => null,
+				'meta'    => array( 'pay_at' => 'studio' ),
+			)
+		);
+		if ( ! is_wp_error( $after ) ) {
+			do_action( 'scp_booking_studio', $after );
+		}
+		return $after;
+	}
+
+	/**
+	 * Încasare la studio, cash sau cu cardul.
+	 *
+	 * @return array|WP_Error
+	 */
+	public static function collect( int $id, string $method ) {
+		if ( ! in_array( $method, array( 'cash', 'card' ), true ) ) {
+			return new WP_Error( 'scp_invalid', 'Metodă de plată necunoscută.', array( 'status' => 422 ) );
+		}
+		$b = self::get( $id );
+		if ( ! $b || 'cancelled' === $b['status'] ) {
+			return new WP_Error( 'scp_not_found', 'Programarea nu există sau e anulată.', array( 'status' => 404 ) );
+		}
+		if ( self::is_paid( $b ) ) {
+			return new WP_Error( 'scp_invalid', 'Programarea e deja plătită.', array( 'status' => 422 ) );
+		}
+		return self::update( $id, array( 'payment_status' => $method ) );
+	}
+
 	/**
 	 * Validează și curăță datele venite din formular sau din admin.
 	 *
@@ -47,17 +137,20 @@ class SCP_Bookings {
 	public static function validate( array $in, bool $admin = false ) {
 		$errors   = array();
 		$packages = SCP_Settings::packages();
+		foreach ( array( 'date', 'time', 'package', 'name', 'email', 'phone', 'message', 'voucher', 'notes' ) as $k ) {
+			$in[ $k ] = isset( $in[ $k ] ) && is_scalar( $in[ $k ] ) ? (string) $in[ $k ] : '';
+		}
 
 		$data = array(
-			'slot_date' => sanitize_text_field( $in['date'] ?? '' ),
-			'slot_time' => sanitize_text_field( $in['time'] ?? '' ),
-			'package'   => sanitize_key( $in['package'] ?? '' ),
-			'name'      => trim( sanitize_text_field( $in['name'] ?? '' ) ),
-			'email'     => trim( sanitize_email( $in['email'] ?? '' ) ),
-			'phone'     => SCP_Helpers::normalize_phone( sanitize_text_field( $in['phone'] ?? '' ) ),
-			'message'   => trim( sanitize_textarea_field( $in['message'] ?? '' ) ),
+			'slot_date' => sanitize_text_field( $in['date'] ),
+			'slot_time' => sanitize_text_field( $in['time'] ),
+			'package'   => sanitize_key( $in['package'] ),
+			'name'      => trim( sanitize_text_field( $in['name'] ) ),
+			'email'     => trim( sanitize_email( $in['email'] ) ),
+			'phone'     => SCP_Helpers::normalize_phone( sanitize_text_field( $in['phone'] ) ),
+			'message'   => trim( sanitize_textarea_field( $in['message'] ) ),
 		);
-		$voucher = strtoupper( trim( sanitize_text_field( $in['voucher'] ?? '' ) ) );
+		$voucher = strtoupper( trim( sanitize_text_field( $in['voucher'] ) ) );
 
 		if ( ! SCP_Helpers::is_date( $data['slot_date'] ) ) {
 			$errors['date'] = 'Alege o zi din calendar.';
@@ -102,7 +195,7 @@ class SCP_Bookings {
 		if ( '' !== $voucher ) {
 			$chk = SCP_Vouchers::check( $voucher, $data['package'] );
 			if ( ! $chk['ok'] ) {
-				return new WP_Error( 'scp_invalid', 'Verifică voucherul.', array( 'status' => 422, 'fields' => array( 'voucher' => $chk['message'] ) ) );
+				return new WP_Error( 'scp_invalid', 'Verifică voucherul.', array( 'status' => 422, 'fields' => array( 'voucher' => $admin ? $chk['detail'] : $chk['message'] ) ) );
 			}
 			// Voucherul cadou plătește integral ședința, la prețul întreg al pachetului.
 			$data['voucher_id'] = (int) $chk['voucher']['id'];
@@ -146,7 +239,7 @@ class SCP_Bookings {
 			return new WP_Error( 'scp_invalid', 'Verifică voucherul.', array( 'status' => 422, 'fields' => array( 'voucher' => 'Voucherul tocmai a fost folosit pentru altă programare.' ) ) );
 		}
 		$needs_pay = ! $voucher_id && (int) SCP_Settings::get( 'pay_hours', 0 ) > 0 && ( ! $admin || ! empty( $in['require_payment'] ) );
-		if ( $admin && isset( $in['payment_status'] ) && in_array( $in['payment_status'], array( 'paid', 'cash', 'voucher' ), true ) ) {
+		if ( $admin && isset( $in['payment_status'] ) && in_array( $in['payment_status'], SCP_Helpers::PAID, true ) ) {
 			$needs_pay = false;
 		}
 		$now  = SCP_Helpers::mysql_now();
@@ -197,7 +290,27 @@ class SCP_Bookings {
 				return new WP_Error( 'scp_db', 'Programarea nu a putut fi salvată. Te rugăm să ne suni.', array( 'status' => 500, 'db' => $err ) );
 			}
 		}
+		if ( $voucher_id ) {
+			SCP_Vouchers::release( $voucher_id );
+		}
 		return new WP_Error( 'scp_db', 'Programarea nu a putut fi salvată. Te rugăm să ne suni.', array( 'status' => 500 ) );
+	}
+
+	/** Câte programări neplătite, încă active, are același telefon sau email (pentru limita din formularul public). */
+	public static function open_unpaid_count( string $phone, string $email ): int {
+		global $wpdb;
+		if ( '' === $phone && '' === $email ) {
+			return 0;
+		}
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM ' . self::table() . " WHERE status = 'pending' AND ( ( %s <> '' AND phone = %s ) OR ( %s <> '' AND email = %s ) )",
+				$phone,
+				$phone,
+				$email,
+				$email
+			)
+		);
 	}
 
 	/**
@@ -238,6 +351,10 @@ class SCP_Bookings {
 				$set[ $f ] = trim( sanitize_textarea_field( (string) $changes[ $f ] ) );
 			}
 		}
+		// Chei noi în meta, îmbinate cu ce există (utm etc. rămân).
+		if ( ! empty( $changes['meta'] ) && is_array( $changes['meta'] ) ) {
+			$set['meta'] = wp_json_encode( array_merge( $before['meta'], $changes['meta'] ) );
+		}
 		// Pachet și voucher cadou. Prețul se recalculează după regulile de la momentul rezervării.
 		$pkg        = $before['package'];
 		$old_gift   = 'gift' === $before['discount_source'] ? $before['discount_code'] : '';
@@ -259,7 +376,7 @@ class SCP_Bookings {
 			if ( '' !== $gift ) {
 				$chk = SCP_Vouchers::check( $gift, $pkg, $id );
 				if ( ! $chk['ok'] ) {
-					return new WP_Error( 'scp_invalid', 'Voucher: ' . $chk['message'], array( 'status' => 422 ) );
+					return new WP_Error( 'scp_invalid', 'Voucher: ' . $chk['detail'], array( 'status' => 422 ) );
 				}
 				if ( (int) $chk['voucher']['booking_id'] !== $id && ! SCP_Vouchers::reserve( (int) $chk['voucher']['id'], $id ) ) {
 					return new WP_Error( 'scp_invalid', 'Voucherul tocmai a fost folosit pentru altă programare.', array( 'status' => 422 ) );
@@ -313,7 +430,7 @@ class SCP_Bookings {
 
 		if ( isset( $changes['payment_status'] ) && array_key_exists( $changes['payment_status'], SCP_Helpers::PAYMENT_STATUSES ) ) {
 			$set['payment_status'] = $changes['payment_status'];
-			if ( in_array( $changes['payment_status'], array( 'paid', 'cash', 'voucher' ), true ) ) {
+			if ( in_array( $changes['payment_status'], SCP_Helpers::PAID, true ) ) {
 				if ( ! $before['paid_at'] ) {
 					$set['paid_at'] = SCP_Helpers::mysql_now();
 				}
@@ -383,7 +500,7 @@ class SCP_Bookings {
 	private static function emit_change( array $before, array $after, array $changes ): void {
 		$moved      = $before['slot_date'] !== $after['slot_date'] || $before['slot_time'] !== $after['slot_time'];
 		$cancelled  = 'cancelled' === $after['status'] && 'cancelled' !== $before['status'];
-		$paid       = in_array( $after['payment_status'], array( 'paid', 'cash', 'voucher' ), true ) && ! in_array( $before['payment_status'], array( 'paid', 'cash', 'voucher' ), true );
+		$paid       = in_array( $after['payment_status'], SCP_Helpers::PAID, true ) && ! in_array( $before['payment_status'], SCP_Helpers::PAID, true );
 		$notify     = ! empty( $changes['notify_client'] );
 
 		if ( $cancelled ) {
@@ -424,22 +541,83 @@ class SCP_Bookings {
 		if ( ! $b || 'paid' === $b['payment_status'] ) {
 			return $b;
 		}
-		$wpdb->update(
-			self::table(),
-			array(
-				'payment_status' => 'paid',
-				'status'         => 'pending' === $b['status'] ? 'confirmed' : $b['status'],
-				'pay_by'         => null,
-				'paid_at'        => SCP_Helpers::mysql_now(),
-				'order_id'       => $order_id,
-				'updated_at'     => SCP_Helpers::mysql_now(),
-			),
-			array( 'id' => $id )
+		if ( self::is_paid( $b ) ) {
+			// Plătită deja la studio sau cu voucher, iar acum a venit și plata online: Ștefan decide rambursarea.
+			SCP_Rest::alert_once( 'scp_alert_dbl_' . $id, 'Programare plătită de două ori', 'Programarea ' . $b['code'] . ' (' . $b['name'] . ', ' . SCP_Helpers::date_ro( $b['slot_date'] ) . ' ' . $b['slot_time'] . ') era deja „' . ( SCP_Helpers::PAYMENT_STATUSES[ $b['payment_status'] ] ?? $b['payment_status'] ) . '”, iar acum a venit și plata online (comanda #' . $order_id . '). Verifică și rambursează una dintre plăți.' );
+			return $b;
+		}
+		$now = SCP_Helpers::mysql_now();
+		$set = array(
+			'payment_status' => 'paid',
+			'status'         => 'pending' === $b['status'] ? 'confirmed' : $b['status'],
+			'pay_by'         => null,
+			'paid_at'        => $now,
+			'order_id'       => $order_id,
+			'updated_at'     => $now,
 		);
+		// Plata a ajuns după ce programarea a expirat: o readucem pe ora ei, dacă e încă liberă.
+		$late = 'cancelled' === $b['status'];
+		if ( $late ) {
+			$set = array_merge( $set, array( 'status' => 'confirmed', 'active_slot' => $b['slot_date'] . ' ' . $b['slot_time'], 'cancelled_at' => null, 'cancel_reason' => '' ) );
+		}
+		// Condiția pe payment_status face actualizarea atomică: două notificări de plată simultane nu confirmă de două ori.
+		$wpdb->suppress_errors( true );
+		$n   = $wpdb->update( self::table(), $set, array( 'id' => $id, 'payment_status' => $b['payment_status'] ) );
+		$err = $wpdb->last_error;
+		$wpdb->suppress_errors( false );
+
+		if ( false === $n && $late && str_contains( $err, 'active_slot' ) ) {
+			// Ora a fost luată între timp: rămâne anulată, dar plătită. Clientul nu primește confirmare; Ștefan e anunțat.
+			unset( $set['status'], $set['active_slot'], $set['cancelled_at'], $set['cancel_reason'] );
+			$n = $wpdb->update( self::table(), $set, array( 'id' => $id, 'payment_status' => $b['payment_status'] ) );
+			if ( $n ) {
+				$after = self::get( $id );
+				SCP_Rest::alert_once( 'scp_alert_late_' . $id, 'Plată primită pentru o oră deja ocupată', 'Programarea ' . $b['code'] . ' (' . $b['name'] . ', ' . $b['phone'] . ') expirase, iar ora ' . SCP_Helpers::date_ro( $b['slot_date'] ) . ' ' . $b['slot_time'] . ' a fost luată de altcineva. Plata a venit totuși (comanda #' . $order_id . '). Sună clientul: mută-l pe altă oră din admin sau rambursează plata.' );
+				do_action( 'scp_booking_updated', $after, $b );
+				return $after;
+			}
+		}
+		if ( ! $n ) {
+			return self::get( $id );
+		}
 		$after = self::get( $id );
+		if ( $late ) {
+			SCP_Rest::alert_once( 'scp_alert_late_' . $id, 'Plată întârziată: programare reactivată', 'Plata pentru ' . $b['code'] . ' (' . $b['name'] . ') a venit după termen. Ora ' . SCP_Helpers::date_ro( $b['slot_date'] ) . ' ' . $b['slot_time'] . ' era încă liberă, așa că programarea a fost reactivată și confirmată.' );
+		}
 		do_action( 'scp_booking_paid', $after );
 		do_action( 'scp_booking_updated', $after, $b );
 		return $after;
+	}
+
+	/** Plata online a fost rambursată sau comanda anulată: programarea rămâne, dar neplătită; Ștefan decide. */
+	public static function mark_refunded( int $id, int $order_id, string $why ): void {
+		$b = self::get( $id );
+		if ( ! $b || 'paid' !== $b['payment_status'] || (int) $b['order_id'] !== $order_id ) {
+			return;
+		}
+		$after = self::update( $id, array( 'payment_status' => 'unpaid' ) );
+		if ( is_wp_error( $after ) ) {
+			return;
+		}
+		SCP_Rest::alert_once( 'scp_alert_ref_' . $id, 'Plată ' . $why . ' pentru o programare', 'Comanda #' . $order_id . ' a programării ' . $b['code'] . ' (' . $b['name'] . ', ' . SCP_Helpers::date_ro( $b['slot_date'] ) . ' ' . $b['slot_time'] . ') a fost ' . $why . '. Programarea e acum „Neplătită”, dar încă activă. Anuleaz-o din admin dacă e cazul: ' . admin_url( 'admin.php?page=scp-bookings&booking=' . $id ) );
+	}
+
+	/** O comandă începută recent pentru programare: nu o anulăm cât timp plata poate fi în curs (Netopia confirmă cu întârziere). */
+	private static function payment_in_progress( int $id ): bool {
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return false;
+		}
+		$ids = wc_get_orders(
+			array(
+				'limit'        => 1,
+				'return'       => 'ids',
+				'status'       => array( 'pending', 'on-hold' ),
+				'meta_key'     => '_scp_booking_id', // phpcs:ignore
+				'meta_value'   => $id, // phpcs:ignore
+				'date_created' => '>' . ( time() - 30 * MINUTE_IN_SECONDS ),
+			)
+		);
+		return ! empty( $ids );
 	}
 
 	/**
@@ -452,8 +630,11 @@ class SCP_Bookings {
 		$now  = SCP_Helpers::mysql_now();
 		$done = array( 'expired' => 0, 'reminded' => 0 );
 
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL AND pay_by <= %s AND payment_status NOT IN ('paid','cash','voucher') LIMIT 50", $now ) );
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL AND pay_by <= %s AND payment_status NOT IN (" . SCP_Helpers::paid_sql() . ") LIMIT 50", $now ) );
 		foreach ( $ids as $id ) {
+			if ( self::payment_in_progress( (int) $id ) ) {
+				continue;
+			}
 			$r = self::update(
 				(int) $id,
 				array(
@@ -474,7 +655,7 @@ class SCP_Bookings {
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT id FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL AND pay_by > %s AND pay_by <= %s AND reminder_sent_at IS NULL
-					 AND TIMESTAMPDIFF(MINUTE, created_at, pay_by) > %d AND payment_status NOT IN ('paid','cash','voucher') LIMIT 50",
+					 AND TIMESTAMPDIFF(MINUTE, created_at, pay_by) > %d AND payment_status NOT IN (" . SCP_Helpers::paid_sql() . ") LIMIT 50",
 					$now,
 					$limit,
 					( $hours + 1 ) * 60
@@ -519,6 +700,28 @@ class SCP_Bookings {
 		global $wpdb;
 		$where = array( '1=1' );
 		$vals  = array();
+		$today = SCP_Helpers::now()->format( 'Y-m-d' );
+
+		// Vederile simple din lista de programări.
+		switch ( $args['view'] ?? '' ) {
+			case 'upcoming':
+				$where[] = 'active_slot IS NOT NULL AND slot_date >= %s';
+				$vals[]  = $today;
+				break;
+			case 'awaiting':
+				$where[] = "status = 'pending'";
+				break;
+			case 'studio':
+				$where[] = "status = 'confirmed' AND payment_status NOT IN (" . SCP_Helpers::paid_sql() . ')';
+				break;
+			case 'past':
+				$where[] = "status <> 'cancelled' AND slot_date < %s";
+				$vals[]  = $today;
+				break;
+			case 'cancelled':
+				$where[] = "status = 'cancelled'";
+				break;
+		}
 
 		if ( ! empty( $args['status'] ) ) {
 			if ( 'active' === $args['status'] ) {
@@ -618,11 +821,12 @@ class SCP_Bookings {
 			}
 		}
 
+		$tomorrow   = SCP_Helpers::now()->modify( '+1 day' )->format( 'Y-m-d' );
 		$today_list = self::query(
 			array(
 				'status'   => 'active',
 				'from'     => $today,
-				'to'       => $today,
+				'to'       => $tomorrow,
 				'per_page' => 50,
 			)
 		)['items'];
@@ -630,10 +834,16 @@ class SCP_Bookings {
 		$upcoming = self::query(
 			array(
 				'status'   => 'active',
-				'from'     => SCP_Helpers::now()->modify( '+1 day' )->format( 'Y-m-d' ),
+				'from'     => SCP_Helpers::now()->modify( '+2 days' )->format( 'Y-m-d' ),
 				'per_page' => 8,
 			)
 		)['items'];
+
+		// Cine trebuie să plătească online, cel mai urgent termen primul.
+		$awaiting = array_map(
+			array( __CLASS__, 'hydrate' ),
+			$wpdb->get_results( "SELECT * FROM {$t} WHERE status = 'pending' ORDER BY pay_by IS NULL, pay_by, slot_date LIMIT 10", ARRAY_A )
+		);
 
 		$recent = self::query(
 			array(
@@ -658,6 +868,7 @@ class SCP_Bookings {
 			'blocked'    => $blocked,
 			'today'      => $today_list,
 			'upcoming'   => $upcoming,
+			'awaiting'   => $awaiting,
 			'recent'     => $recent,
 		);
 	}

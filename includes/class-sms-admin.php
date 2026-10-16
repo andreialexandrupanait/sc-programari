@@ -240,6 +240,8 @@ class SCP_SMS_Admin {
 						'created'     => 'La rezervare (cu link de plată)',
 						'paid'        => 'La plată',
 						'voucher'     => 'La rezervarea cu voucher',
+						'studio'      => 'La rezervarea cu plata la studio',
+						'moved'       => 'La mutarea ședinței (din admin, cu „Anunță clientul”)',
 						'remind_day'  => 'Cu o zi înainte',
 						'remind_hour' => 'Cu o oră înainte',
 					);

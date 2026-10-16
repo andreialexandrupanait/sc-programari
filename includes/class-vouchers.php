@@ -40,6 +40,13 @@ class SCP_Vouchers {
 	 * ușor de confundat (0/O, 1/I/L). Partea aleatorie are 31^6 ≈ 887 milioane de combinații pe fiecare cuvânt,
 	 * iar verificarea codurilor din formular e limitată la 20 de încercări pe oră.
 	 */
+	/** Câmpurile opționale din checkout-ul voucherului: pentru cine e cadoul. */
+	public const GIFT_FIELDS = array(
+		'recipient_name'  => 'Cadou pentru: nume',
+		'recipient_email' => 'Cadou pentru: email',
+		'recipient_phone' => 'Cadou pentru: telefon',
+	);
+
 	public const CODE_WORDS = array( 'BRAD', 'STEA', 'FULG', 'SANIE', 'RENI', 'CADOU', 'COLIND', 'GLOB', 'NEA', 'ELF' );
 
 	private static function new_code(): string {
@@ -54,7 +61,7 @@ class SCP_Vouchers {
 		if ( strlen( $norm ) < 6 ) {
 			return null;
 		}
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . " WHERE REPLACE(code, '-', '') = %s", $norm ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE code_norm = %s', $norm ), ARRAY_A );
 		return $row ?: null;
 	}
 
@@ -67,10 +74,13 @@ class SCP_Vouchers {
 	/**
 	 * Verifică un cod pentru un pachet (sau, fără pachet, spune pentru ce pachet e).
 	 *
-	 * @return array{ok:bool,message:string,voucher:?array}
+	 * „message” e generic (nu spune dacă un cod există), ca să nu ajute la ghicit; „detail” e pentru admin.
+	 *
+	 * @return array{ok:bool,message:string,detail:string,voucher:?array}
 	 */
 	public static function check( string $code, string $package = '', int $allow_booking = 0 ): array {
-		$fail = static fn( string $m, ?array $v = null ) => array( 'ok' => false, 'message' => $m, 'voucher' => $v );
+		$generic = 'Codul nu e valid sau nu mai poate fi folosit. Verifică-l sau sună-ne.';
+		$fail    = static fn( string $m, ?array $v = null ) => array( 'ok' => false, 'message' => $v && 'package' === ( $v['_why'] ?? '' ) ? $m : $generic, 'detail' => $m, 'voucher' => $v );
 		$v    = self::get_by_code( $code );
 		if ( ! $v ) {
 			return $fail( 'Nu găsim acest voucher. Verifică dacă l-ai scris corect.' );
@@ -86,9 +96,9 @@ class SCP_Vouchers {
 		}
 		if ( '' !== $package && $package !== $v['package'] ) {
 			$label = SCP_Settings::packages()[ $v['package'] ]['label'] ?? $v['package'];
-			return $fail( 'Voucherul este pentru ' . $label . ' și se poate folosi doar pentru acest pachet.', $v );
+			return $fail( 'Voucherul este pentru ' . $label . ' și se poate folosi doar pentru acest pachet.', $v + array( '_why' => 'package' ) );
 		}
-		return array( 'ok' => true, 'message' => '', 'voucher' => $v );
+		return array( 'ok' => true, 'message' => '', 'detail' => '', 'voucher' => $v );
 	}
 
 	/** Marchează voucherul ca folosit, atomic: două programări nu pot folosi același cod. */
@@ -139,6 +149,7 @@ class SCP_Vouchers {
 				self::table(),
 				array(
 					'code'          => $code,
+					'code_norm'     => self::normalize( $code ),
 					'package'       => $pkg,
 					'value'         => isset( $data['value'] ) ? (float) $data['value'] : $packages[ $pkg ]['price'],
 					'status'        => 'active',
@@ -146,6 +157,10 @@ class SCP_Vouchers {
 					'order_item_id' => $data['order_item_id'] ?? null,
 					'buyer_name'    => sanitize_text_field( $data['buyer_name'] ?? '' ),
 					'buyer_email'   => sanitize_email( $data['buyer_email'] ?? '' ),
+					'buyer_phone'   => sanitize_text_field( $data['buyer_phone'] ?? '' ),
+					'recipient_name'  => sanitize_text_field( $data['recipient_name'] ?? '' ),
+					'recipient_email' => sanitize_email( $data['recipient_email'] ?? '' ),
+					'recipient_phone' => sanitize_text_field( $data['recipient_phone'] ?? '' ),
 					'note'          => sanitize_text_field( $data['note'] ?? '' ),
 					'expires_on'    => SCP_Helpers::is_date( $data['expires_on'] ?? '' ) ? $data['expires_on'] : (string) SCP_Settings::get( 'end_date' ),
 					'created_at'    => SCP_Helpers::mysql_now(),
@@ -173,11 +188,34 @@ class SCP_Vouchers {
 	}
 
 	public static function issue_for_order( $order_id ): void {
+		try {
+			self::issue_for_order_inner( $order_id );
+		} catch ( \Throwable $e ) {
+			// O eroare aici nu are voie să strice confirmarea plății (IPN Netopia).
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->error( 'Vouchere comanda #' . $order_id . ': ' . $e->getMessage(), array( 'source' => 'sc-programari' ) );
+			}
+		}
+	}
+
+	private static function issue_for_order_inner( $order_id ): void {
 		$order = wc_get_order( $order_id );
 		if ( ! $order || ! $order->is_paid() || $order->get_meta( '_scp_vouchers_issued' ) ) {
 			return;
 		}
+		// add_option e atomic (cheie unică): doar primul proces trece.
+		$lock = 'scp_vlock_' . (int) $order->get_id();
+		if ( ! add_option( $lock, time(), '', false ) ) {
+			if ( (int) get_option( $lock ) > time() - 300 ) {
+				return;
+			}
+			update_option( $lock, time(), false ); // lock rămas de la un proces căzut
+		}
 		$issued = array();
+		$gift   = array();
+		foreach ( self::GIFT_FIELDS as $key => $label ) {
+			$gift[ $key ] = (string) $order->get_meta( '_scp_' . $key );
+		}
 		foreach ( $order->get_items() as $item_id => $item ) {
 			$pkg = self::package_for_product( (int) $item->get_product_id(), (int) $item->get_variation_id() );
 			if ( ! $pkg ) {
@@ -194,7 +232,8 @@ class SCP_Vouchers {
 						'order_item_id' => $item_id,
 						'buyer_name'    => trim( $order->get_billing_last_name() . ' ' . $order->get_billing_first_name() ),
 						'buyer_email'   => $order->get_billing_email(),
-					)
+						'buyer_phone'   => $order->get_billing_phone(),
+					) + $gift
 				);
 				if ( $v ) {
 					$codes[]  = $v['code'];
@@ -206,9 +245,11 @@ class SCP_Vouchers {
 			}
 		}
 		if ( ! $issued ) {
+			delete_option( $lock );
 			return;
 		}
 		$order->update_meta_data( '_scp_vouchers_issued', 1 );
+		delete_option( $lock );
 		$order->add_order_note( 'Vouchere emise: ' . implode( ', ', array_column( $issued, 'code' ) ) );
 		$order->save();
 		SCP_Mailer::send_vouchers( $issued, $order->get_billing_email(), trim( $order->get_billing_first_name() ) );
@@ -216,6 +257,11 @@ class SCP_Vouchers {
 
 	public static function cancel_for_order( $order_id ): void {
 		global $wpdb;
+		$used = $wpdb->get_results( $wpdb->prepare( 'SELECT code, booking_id FROM ' . self::table() . " WHERE order_id = %d AND status = 'used'", (int) $order_id ), ARRAY_A );
+		if ( $used ) {
+			$lines = array_map( static fn( $r ) => $r['code'] . ' (programarea #' . $r['booking_id'] . ')', $used );
+			SCP_Rest::alert_once( 'scp_alert_vref_' . (int) $order_id, 'Voucher rambursat, dar deja folosit', 'Comanda #' . (int) $order_id . ' a fost rambursată sau anulată, dar aceste vouchere au fost deja folosite: ' . implode( ', ', $lines ) . '. Programările au rămas confirmate; decide tu dacă le anulezi.' );
+		}
 		$wpdb->query( $wpdb->prepare( 'UPDATE ' . self::table() . " SET status = 'cancelled' WHERE order_id = %d AND status = 'active'", (int) $order_id ) );
 	}
 
@@ -241,8 +287,8 @@ class SCP_Vouchers {
 		}
 		if ( ! empty( $args['search'] ) ) {
 			$like    = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-			$where[] = '(code LIKE %s OR buyer_name LIKE %s OR buyer_email LIKE %s)';
-			array_push( $vals, $like, $like, $like );
+			$where[] = '(code LIKE %s OR buyer_name LIKE %s OR buyer_email LIKE %s OR buyer_phone LIKE %s OR recipient_name LIKE %s OR recipient_email LIKE %s OR recipient_phone LIKE %s)';
+			array_push( $vals, $like, $like, $like, $like, $like, $like, $like );
 		}
 		$sql = 'SELECT * FROM ' . self::table() . ' WHERE ' . implode( ' AND ', $where ) . ' ORDER BY id DESC LIMIT 500';
 		return $vals ? $wpdb->get_results( $wpdb->prepare( $sql, $vals ), ARRAY_A ) : $wpdb->get_results( $sql, ARRAY_A );
@@ -270,6 +316,10 @@ class SCP_Vouchers {
 			'order_id'      => $v['order_id'] ? (int) $v['order_id'] : null,
 			'buyer_name'    => $v['buyer_name'],
 			'buyer_email'   => $v['buyer_email'],
+			'buyer_phone'   => $v['buyer_phone'] ?? '',
+			'recipient_name'  => $v['recipient_name'] ?? '',
+			'recipient_email' => $v['recipient_email'] ?? '',
+			'recipient_phone' => $v['recipient_phone'] ?? '',
 			'booking_id'    => $v['booking_id'] ? (int) $v['booking_id'] : null,
 			'expires_on'    => $v['expires_on'],
 			'created_at'    => ( new DateTimeImmutable( $v['created_at'], SCP_Helpers::tz() ) )->format( DATE_ATOM ),

@@ -3,7 +3,7 @@
 	'use strict';
 	var A = window.SCP_ADMIN || {};
 	var MONTHS = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie'];
-	var PAY = { unpaid: 'Neplătită', link_sent: 'Link trimis', paid: 'Plătită online', cash: 'Plătită la studio' };
+	var PAY = { unpaid: 'Neplătită', link_sent: 'Link trimis', paid: 'Plătită online', cash: 'Plătită cash', card: 'Plătită cu cardul', voucher: 'Plătită cu voucher' };
 
 	function api(path, opts) {
 		opts = opts || {};
@@ -43,6 +43,29 @@
 	}
 
 	/* =========================================================
+	 * Încasare la studio (Panou): Cash / Card
+	 * ======================================================= */
+	document.addEventListener('click', function (e) {
+		var b = e.target.closest('[data-collect]');
+		if (!b || b.closest('.scpq')) return;
+		var li = b.closest('[data-id]'), method = b.getAttribute('data-collect');
+		if (!li) return;
+		li.querySelectorAll('[data-collect]').forEach(function (x) { x.disabled = true; });
+		api('/booking/' + li.getAttribute('data-id') + '/pay', { method: 'POST', body: { method: method } })
+			.then(function (r) {
+				var badge = li.querySelector('.scp-badge');
+				if (badge) { badge.className = 'scp-badge scp-badge--ps-paid'; badge.textContent = method === 'card' ? 'Plătită card' : 'Plătită cash'; }
+				var box = li.querySelector('.scp-collect-btns');
+				if (box) box.remove();
+				toast(r.label || 'Încasat.');
+			})
+			.catch(function (err) {
+				li.querySelectorAll('[data-collect]').forEach(function (x) { x.disabled = false; });
+				toast(err.message, true);
+			});
+	});
+
+	/* =========================================================
 	 * Calendar
 	 * ======================================================= */
 	function Calendar(root) {
@@ -67,11 +90,18 @@
 			});
 		});
 		this.hideClosed.addEventListener('change', function () { self.render(); });
+		this.side = root.querySelector('.scp-cal-side');
+		var backdrop = root.querySelector('.scp-cal-backdrop');
+		if (backdrop) backdrop.addEventListener('click', function () { self.closeSide(); });
 		this.pop = el('div', { class: 'scp-pop', hidden: true });
 		document.body.appendChild(this.pop);
-		document.addEventListener('click', function (e) { if (!self.pop.contains(e.target) && !e.target.closest('.scp-cell, .scp-dayact')) self.closePop(); });
-		document.addEventListener('keydown', function (e) { if (e.key === 'Escape') self.closePop(); });
+		document.addEventListener('click', function (e) { if (!self.pop.contains(e.target) && !e.target.closest('.scp-dayact')) self.closePop(); });
+		document.addEventListener('keydown', function (e) {
+			if (e.key !== 'Escape') return;
+			if (!self.pop.hidden) self.closePop(); else if (self.sel) self.closeSide();
+		});
 		window.addEventListener('scroll', function () { if (Date.now() - (self.openedAt || 0) > 400) self.closePop(); }, { passive: true });
+		this.closeSide();
 		this.load();
 	}
 
@@ -87,6 +117,10 @@
 			self.data = d;
 			self.body.classList.remove('is-loading');
 			self.render();
+			if (self.sel) {
+				var f = self.findSlot(self.sel.date, self.sel.time);
+				if (f) self.showSide(f.day, f.slot);
+			}
 		}).catch(function (e) { self.body.textContent = e.message; });
 	};
 
@@ -132,9 +166,12 @@
 				var cls = 'scp-cell scp-cell--' + s.state + (s.kind === 'extra' ? ' is-extra' : '');
 				var content = [];
 				if (s.state === 'booked' && s.booking) {
-					cls += ' pay-' + s.booking.payment_status + (s.booking.plus ? ' is-plus' : '');
+					var ps = s.booking.pay || { key: s.booking.payment_status, short: PAY[s.booking.payment_status] || '' };
+					cls += ' pay-' + ps.key + (s.booking.plus ? ' is-plus' : '');
 					content.push(el('span', { class: 'scp-cell-name', text: s.booking.name }));
-					content.push(el('span', { class: 'scp-cell-meta', text: (s.booking.plus ? 'Plus' : 'Foto') + ' · ' + (PAY[s.booking.payment_status] || '') }));
+					if (s.booking.phone) content.push(el('span', { class: 'scp-cell-line', text: s.booking.phone }));
+					if (s.booking.email) content.push(el('span', { class: 'scp-cell-line', text: s.booking.email }));
+					content.push(el('span', { class: 'scp-cell-meta', text: s.booking.package + ' · ' + ps.short }));
 				} else if (s.state === 'blocked') {
 					content.push(el('span', { class: 'scp-cell-meta', text: s.reason || 'blocat' }));
 				} else if (s.state === 'free') {
@@ -143,9 +180,9 @@
 					content.push(el('span', { class: 'scp-cell-meta', text: '–' }));
 				}
 				var td = el('td', {}, [el('button', {
-					type: 'button', class: cls,
-					'aria-label': day.label + ' ' + t + ': ' + (s.state === 'booked' && s.booking ? s.booking.name : s.state),
-					onclick: function (e) { self.cellMenu(e.currentTarget, day, s); }
+					type: 'button', class: cls + (self.sel && self.sel.date === day.date && self.sel.time === t ? ' is-selected' : ''), 'data-slot': day.date + ' ' + t,
+					'aria-label': day.label + ' ' + t + ': ' + (s.state === 'booked' && s.booking ? s.booking.name : ({ free: 'liber', blocked: 'blocat', past: 'trecut' })[s.state] || s.state),
+					onclick: function () { self.closePop(); self.select(day, s); }
 				}, content)]);
 				tr.appendChild(td);
 			});
@@ -187,32 +224,202 @@
 		}).catch(function (e) { toast(e.message, true); });
 	};
 
-	Calendar.prototype.cellMenu = function (btn, day, s) {
+	/* ---------- Panoul din dreapta: detaliile orei alese ---------- */
+	function ucfirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+	function copyText(text) {
+		var done = function () { toast('Copiat.'); };
+		var manual = function () { window.prompt('Copiază linkul:', text); };
+		if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, manual); else manual();
+	}
+
+	Calendar.prototype.findSlot = function (date, time) {
+		var day = ((this.data && this.data.days) || []).find(function (d) { return d.date === date; });
+		if (!day) return null;
+		var s = day.slots.find(function (x) { return x.time === time; });
+		return s ? { day: day, slot: s } : null;
+	};
+
+	Calendar.prototype.select = function (day, s) {
+		this.sel = { date: day.date, time: s.time };
+		this.markSelected();
+		this.showSide(day, s);
+		this.root.classList.add('has-side');
+	};
+
+	Calendar.prototype.markSelected = function () {
+		var key = this.sel ? this.sel.date + ' ' + this.sel.time : '';
+		this.root.querySelectorAll('.scp-cell[data-slot]').forEach(function (c) { c.classList.toggle('is-selected', c.getAttribute('data-slot') === key); });
+	};
+
+	Calendar.prototype.closeSide = function () {
+		this.sel = null;
+		this.markSelected();
+		this.root.classList.remove('has-side');
+		this.fillSide(null, [el('p', { class: 'scp-side-empty', text: 'Apasă pe o oră din calendar ca să vezi aici detaliile și ce poți face cu ea.' })]);
+	};
+
+	Calendar.prototype.fillSide = function (title, kids) {
 		var self = this;
-		var title = el('p', { class: 'scp-pop-title', text: day.label.charAt(0).toUpperCase() + day.label.slice(1) + ', ' + s.time });
+		this.side.innerHTML = '';
+		this.side.appendChild(el('div', { class: 'scp-side-head' }, [
+			el('p', { class: 'scp-side-when', text: title || 'Detalii' }),
+			el('button', { type: 'button', class: 'scp-side-close', 'aria-label': 'Închide panoul', text: '×', onclick: function () { self.closeSide(); } })
+		]));
+		kids.forEach(function (k) { if (k) this.side.appendChild(k); }, this);
+	};
+
+	Calendar.prototype.showSide = function (day, s) {
+		var self = this;
+		var title = ucfirst(day.label) + ', ora ' + s.time;
+		var newLink = el('a', { class: 'button button-primary scp-side-wide', href: (s.state === 'free' ? A.quickUrl : A.newUrl) + '&date=' + day.date + '&time=' + s.time, text: 'Programare nouă pe această oră' });
 		if (s.state === 'booked' && s.booking) {
-			window.location.href = A.bookingUrl + s.booking.id;
+			if (!this.side.querySelector('.scp-side-name')) this.fillSide(title, [el('p', { class: 'scp-muted', text: 'Se încarcă…' })]);
+			api('/booking/' + s.booking.id).then(function (b) {
+				if (self.sel && self.sel.date === day.date && self.sel.time === s.time) self.bookingSide(b);
+			}).catch(function (e) { self.fillSide(title, [el('p', { class: 'scp-err', text: e.message })]); });
 			return;
 		}
-		var newLink = el('a', { class: 'button button-primary', href: A.newUrl + '&date=' + day.date + '&time=' + s.time, text: 'Programare nouă' });
 		if (s.state === 'free') {
 			var reason = el('input', { type: 'text', placeholder: 'Motiv (opțional, doar pentru voi)', class: 'scp-pop-input' });
-			var block = el('button', { type: 'button', class: 'button', text: 'Blochează ora', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle', reason: reason.value }, 'Ora ' + s.time + ' a fost blocată.'); } });
-			var remove = s.kind === 'extra' ? el('button', { type: 'button', class: 'button-link scp-danger-link', text: 'Scoate ora din această zi', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle' }, 'Ora a fost scoasă.'); } }) : null;
-			if (s.kind === 'extra') {
-				this.openPop(btn, [title, el('div', { class: 'scp-pop-row' }, [newLink]), remove]);
-			} else {
-				this.openPop(btn, [title, reason, el('div', { class: 'scp-pop-row' }, [block, newLink])]);
-			}
+			this.fillSide(title, [
+				el('p', { class: 'scp-side-state', text: s.kind === 'extra' ? 'Oră liberă, adăugată doar în această zi.' : 'Oră liberă.' }),
+				newLink,
+				el('div', { class: 'scp-side-sec' }, s.kind === 'extra'
+					? [el('button', { type: 'button', class: 'button-link scp-danger-link', text: 'Scoate ora din această zi', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle' }, 'Ora a fost scoasă.'); } })]
+					: [el('p', { class: 'scp-side-label', text: 'Nu lucrezi la ora asta?' }), reason, el('button', { type: 'button', class: 'button', text: 'Blochează ora', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle', reason: reason.value }, 'Ora ' + s.time + ' a fost blocată.'); } })])
+			]);
 		} else if (s.state === 'blocked') {
-			if (day.day_blocked) {
-				this.openPop(btn, [title, el('p', { text: 'Toată ziua e închisă.' }), el('button', { type: 'button', class: 'button button-primary', text: 'Redeschide ziua', onclick: function () { self.act('/day', { date: day.date, block: false }, 'Ziua a fost redeschisă.'); } })]);
-			} else {
-				this.openPop(btn, [title, s.reason ? el('p', { text: 'Motiv: ' + s.reason }) : null, el('button', { type: 'button', class: 'button button-primary', text: 'Deblochează ora', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle' }, 'Ora ' + s.time + ' e din nou liberă.'); } })]);
-			}
+			this.fillSide(title, day.day_blocked
+				? [el('p', { class: 'scp-side-state', text: 'Toată ziua e închisă' + (day.day_reason ? ': ' + day.day_reason : '.') }), el('button', { type: 'button', class: 'button button-primary', text: 'Redeschide ziua', onclick: function () { self.act('/day', { date: day.date, block: false }, 'Ziua a fost redeschisă.'); } })]
+				: [el('p', { class: 'scp-side-state', text: 'Oră blocată' + (s.reason ? ': ' + s.reason : '.') }), el('button', { type: 'button', class: 'button button-primary', text: 'Deblochează ora', onclick: function () { self.act('/slot', { date: day.date, time: s.time, action: 'toggle' }, 'Ora ' + s.time + ' e din nou liberă.'); } })]);
 		} else {
-			this.openPop(btn, [title, el('p', { text: 'Ora a trecut sau e prea aproape pentru rezervări online. Din admin o poți programa totuși.' }), newLink]);
+			this.fillSide(title, [el('p', { class: 'scp-side-state', text: 'Ora a trecut sau e prea aproape pentru rezervări online. Din admin o poți programa totuși.' }), newLink]);
 		}
+	};
+
+	Calendar.prototype.bookingSide = function (b) {
+		var self = this;
+		function row(label, value, node) {
+			if (!value && !node) return null;
+			return el('div', { class: 'scp-side-row' }, [el('dt', { text: label }), el('dd', {}, [node || value])]);
+		}
+		function post(path, body, msg) {
+			return api(path, { method: 'POST', body: body || {} }).then(function (r) { toast(msg); self.load(); return r; }).catch(function (e) { toast(e.message, true); });
+		}
+
+		var contact = el('div', { class: 'scp-side-contact' }, [
+			b.phone ? el('a', { class: 'scp-side-phone', href: 'tel:' + b.tel, text: b.phone }) : el('span', { class: 'scp-muted', text: 'fără telefon' }),
+			b.email ? el('a', { class: 'scp-side-email', href: 'mailto:' + b.email, text: b.email }) : el('span', { class: 'scp-muted', text: 'fără email' })
+		]);
+
+		var moveBox = el('div', { class: 'scp-side-box', hidden: true });
+		var cancelBox = el('div', { class: 'scp-side-box scp-side-box--danger', hidden: true });
+		var actions = el('div', { class: 'scp-side-actions' });
+		if (b.can.move) {
+			actions.appendChild(el('button', { type: 'button', class: 'button button-primary scp-side-wide', text: 'Mută pe altă zi sau oră', onclick: function () {
+				cancelBox.hidden = true;
+				moveBox.hidden = !moveBox.hidden;
+				if (!moveBox.hidden) self.moveForm(moveBox, b);
+			} }));
+			actions.appendChild(moveBox);
+		}
+		if (b.can.collect) {
+			actions.appendChild(el('div', { class: 'scp-side-collect' }, [
+				el('span', { text: 'Încasat la studio:' }),
+				el('button', { type: 'button', class: 'button', text: 'Cash', onclick: function () { post('/booking/' + b.id + '/pay', { method: 'cash' }, 'Marcată plătită cash.'); } }),
+				el('button', { type: 'button', class: 'button', text: 'Card', onclick: function () { post('/booking/' + b.id + '/pay', { method: 'card' }, 'Marcată plătită cu cardul.'); } })
+			]));
+		}
+		if (b.can.studio) {
+			actions.appendChild(el('button', { type: 'button', class: 'button scp-side-wide', text: 'Trece pe plată la studio', title: 'Se confirmă și nu mai expiră; plătește cash sau card la ședință.', onclick: function () { post('/booking/' + b.id + '/studio', {}, 'Confirmată cu plata la studio.'); } }));
+		}
+		actions.appendChild(el('a', { class: 'button scp-side-wide', href: b.admin_url, text: 'Deschide fișa completă' }));
+
+		if (b.can.cancel) {
+			var notify = el('input', { type: 'checkbox', checked: true });
+			cancelBox.appendChild(el('p', { text: 'Anulezi programarea? Ora se eliberează pe site.' }));
+			cancelBox.appendChild(el('label', { class: 'scp-side-check' }, [notify, ' Anunță clientul pe email']));
+			cancelBox.appendChild(el('button', { type: 'button', class: 'button scp-danger-btn', text: 'Da, anulează', onclick: function () { post('/booking/' + b.id + '/cancel', { notify: notify.checked ? 1 : 0 }, 'Programarea a fost anulată.'); } }));
+		}
+
+		var payLink = b.pay_link ? el('span', {}, [
+			el('a', { href: b.pay_link, target: '_blank', rel: 'noopener', text: 'deschide' }), ' · ',
+			el('button', { type: 'button', class: 'button-link', text: 'copiază', onclick: function () { copyText(b.pay_link); } })
+		]) : null;
+
+		this.fillSide(ucfirst(b.when), [
+			el('h2', { class: 'scp-side-name', text: b.name }),
+			el('div', { class: 'scp-side-badges' }, [
+				el('span', { class: 'scp-badge scp-badge--ps-' + b.pay.key, text: b.pay.label }),
+				b.status === 'confirmed' || b.status === 'pending' ? null : el('span', { class: 'scp-badge', text: b.status_label })
+			]),
+			contact,
+			el('dl', { class: 'scp-side-dl' }, [
+				row('Pachet', b.package + ' · ' + b.price),
+				row('Reducere', b.discount),
+				row('Voucher', b.voucher),
+				row('Mesaj client', b.message),
+				row('Observații', b.notes),
+				row('Link de plată', null, payLink),
+				row('Cod', b.code),
+				row('Sursa', b.source_label + ' · ' + b.created)
+			]),
+			actions,
+			b.can.cancel ? el('button', { type: 'button', class: 'button-link scp-danger-link', text: 'Anulează programarea', onclick: function () { moveBox.hidden = true; cancelBox.hidden = !cancelBox.hidden; } }) : null,
+			cancelBox
+		]);
+	};
+
+	/** Mutarea: ziua, apoi orele libere din ziua aleasă. Plata rămâne cum e. */
+	Calendar.prototype.moveForm = function (box, b) {
+		var self = this, chosen = '';
+		box.innerHTML = '';
+		var date = el('input', { type: 'date', value: b.date, min: A.start, max: A.end, class: 'scp-pop-input', 'aria-label': 'Noua zi' });
+		var times = el('div', { class: 'scp-side-times' });
+		var notify = el('input', { type: 'checkbox', checked: true });
+		var go = el('button', { type: 'button', class: 'button button-primary scp-side-wide', text: 'Alege o oră', disabled: true });
+		function load() {
+			chosen = '';
+			go.disabled = true;
+			go.textContent = 'Alege o oră';
+			times.innerHTML = '';
+			times.appendChild(el('span', { class: 'scp-muted', text: 'Se încarcă…' }));
+			api('/calendar?from=' + date.value + '&to=' + date.value).then(function (d) {
+				times.innerHTML = '';
+				var day = d.days[0];
+				var free = day ? day.slots.filter(function (s) { return s.state === 'free'; }) : [];
+				if (!free.length) { times.appendChild(el('span', { class: 'scp-muted', text: 'Nicio oră liberă în această zi.' })); return; }
+				free.forEach(function (s) {
+					times.appendChild(el('button', { type: 'button', class: 'scp-side-time', text: s.time, onclick: function (e) {
+						times.querySelectorAll('.scp-side-time').forEach(function (x) { x.classList.remove('is-on'); });
+						e.currentTarget.classList.add('is-on');
+						chosen = s.time;
+						go.disabled = false;
+						go.textContent = 'Mută pe ' + day.label + ', ' + s.time;
+					} }));
+				});
+			}).catch(function (e) { times.innerHTML = ''; times.appendChild(el('span', { class: 'scp-err', text: e.message })); });
+		}
+		date.addEventListener('change', load);
+		go.addEventListener('click', function () {
+			if (!chosen) return;
+			go.disabled = true;
+			api('/booking/' + b.id + '/move', { method: 'POST', body: { date: date.value, time: chosen, notify: notify.checked ? 1 : 0 } }).then(function () {
+				toast('Programarea a fost mutată' + (notify.checked ? '. Clientul a fost anunțat.' : '.'));
+				self.sel = { date: date.value, time: chosen };
+				var m = self.months.indexOf(date.value.slice(0, 7));
+				if (m !== -1) self.idx = m;
+				self.load();
+			}).catch(function (e) { toast(e.message, true); load(); });
+		});
+		box.appendChild(el('p', { class: 'scp-side-label', text: 'Noua zi' }));
+		box.appendChild(date);
+		box.appendChild(el('p', { class: 'scp-side-label', text: 'Orele libere' }));
+		box.appendChild(times);
+		box.appendChild(el('label', { class: 'scp-side-check' }, [notify, ' Anunță clientul (email și SMS cu noua oră)']));
+		box.appendChild(go);
+		box.appendChild(el('p', { class: 'scp-side-note', text: 'Plata rămâne așa cum e. Reamintirile se reprogramează, iar Sheet-ul se actualizează singur.' }));
+		load();
 	};
 
 	Calendar.prototype.dayMenu = function (btn, day) {
@@ -302,6 +509,15 @@
 				var done = function () { toast('Copiat.'); };
 				if (navigator.clipboard) navigator.clipboard.writeText(input.value).then(done, function () { input.select(); document.execCommand('copy'); done(); });
 				else { input.select(); document.execCommand('copy'); done(); }
+			});
+		});
+		document.querySelectorAll('[data-reveal]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				var input = document.querySelector(b.getAttribute('data-reveal'));
+				if (!input) return;
+				var show = input.type === 'password';
+				input.type = show ? 'text' : 'password';
+				b.textContent = show ? 'Ascunde' : 'Arată';
 			});
 		});
 		document.querySelectorAll('[data-regenerate]').forEach(function (b) {

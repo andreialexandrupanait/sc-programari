@@ -5,3 +5,6 @@ build/
 # Fișiere de sistem
 .DS_Store
 Thumbs.db
+
+# Exporturi cu setări (pot conține chei)
+tools/sc-migrare-craciun-2026/data/export.json

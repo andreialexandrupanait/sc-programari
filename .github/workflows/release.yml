@@ -27,6 +27,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: none
+
+      - name: Verificari inainte de release (sintaxa, versiune, fisiere)
+        run: |
+          set -e
+          # 1. Sintaxa PHP in tot pluginul (fara dev/ si tools/, care nu intra in ZIP)
+          find . -name '*.php' -not -path './dev/*' -not -path './tools/*' -not -path './.git/*' -print0 | xargs -0 -n1 php -l > /dev/null
+          # 2. Versiunea din header = SCP_VERSION
+          H=$(grep -iE '^\s*\*\s*Version:' sc-programari.php | head -1 | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          C=$(grep -oE "define\( 'SCP_VERSION', '[^']+'" sc-programari.php | sed -E "s/.*'([^']+)'$/\1/")
+          if [ "$H" != "$C" ]; then echo "Version din header ($H) difera de SCP_VERSION ($C)" >&2; exit 1; fi
+          # 3. Fiecare fisier din assets/ incarcat in cod exista in repo
+          for f in $(grep -rhoE "assets/[A-Za-z0-9_./-]+\.(css|js|woff2)" includes sc-programari.php | sort -u); do
+            if [ ! -f "$f" ]; then echo "Lipseste $f (e incarcat in cod, dar nu e in repo)" >&2; exit 1; fi
+          done
+          echo "Verificari OK"
+
       - name: Citeste versiunea din header
         id: version
         run: |

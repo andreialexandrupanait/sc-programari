@@ -1,0 +1,78 @@
+/* SC Programări – programare rapidă (gândită întâi pentru telefon) */
+.scpq { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; max-width: 760px; }
+.scpq [hidden] { display: none !important; }
+.scpq-form, .scpq-done { margin: 0; min-width: 0; }
+.scpq-step + .scpq-step { border-top: 1px solid #f0ece4; margin-top: 18px; padding-top: 18px; }
+.scpq-step h2 { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.scpq-step h2 small { font-weight: 500; color: var(--muted); margin-left: 0; }
+.scpq-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--g); color: #fff; font-size: 13px; font-weight: 700; flex: none; }
+
+/* Zile */
+.scpq-daylist { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.scpq-day { flex: none; scroll-snap-align: start; width: 68px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px 9px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); cursor: pointer; font: inherit; }
+.scpq-day:hover { border-color: var(--g); }
+.scpq-day.is-on { background: var(--g); border-color: var(--g); color: #fff; }
+.scpq-day-wd, .scpq-day-m { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.scpq-day-d { font-size: 22px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.scpq-day-n { margin-top: 3px; font-size: 11px; color: var(--g); font-weight: 600; }
+.scpq-day.is-on .scpq-day-wd, .scpq-day.is-on .scpq-day-m, .scpq-day.is-on .scpq-day-n { color: #dbe7d5; }
+
+/* Ore și pachete */
+.scpq-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.scpq-chip { min-width: 84px; min-height: 48px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums; }
+.scpq-chip:hover { border-color: var(--g); }
+.scpq-chip.is-on { background: var(--g); border-color: var(--g); color: #fff; }
+.scpq-chips--wide .scpq-chip { flex: 1 1 200px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font-size: 15px; }
+.scpq-chip--pkg span { font-weight: 500; color: var(--muted); }
+.scpq-chip--pkg s { margin-right: 2px; }
+.scpq-chip--pkg.is-on span { color: #dbe7d5; }
+
+/* Client */
+.scpq-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.scpq-fields label { display: flex; flex-direction: column; gap: 4px; }
+.scpq-fields label:first-child, .scpq-more { grid-column: 1 / -1; }
+.scpq-fields label > span, .scpq-voucher > span { font-size: 13px; font-weight: 600; color: var(--ink); }
+.scpq-fields label > span small { font-weight: 400; color: var(--muted); }
+.scpq-fields em { font-style: normal; font-size: 12px; color: var(--muted); }
+.scpq input[type="text"], .scpq input[type="tel"], .scpq input[type="email"], .scpq textarea { width: 100%; min-height: 44px; font-size: 16px; padding: 8px 10px; border-radius: 8px; }
+.scpq textarea { min-height: 0; }
+.scpq [aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
+.scpq-field-err { font-size: 12.5px; color: var(--red); font-weight: 600; }
+.scpq-more summary { cursor: pointer; color: var(--g); font-weight: 600; padding: 4px 0; }
+.scpq-more[open] summary { margin-bottom: 8px; }
+.scpq-more label + label { margin-top: 10px; }
+
+/* Plată */
+.scpq-pay { display: grid; gap: 8px; }
+.scpq-opt { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: #fff; }
+.scpq-opt input { margin-top: 3px; flex: none; }
+.scpq-opt span { display: flex; flex-direction: column; gap: 2px; }
+.scpq-opt b { font-size: 15px; color: var(--ink); }
+.scpq-opt em { font-style: normal; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.scpq-opt.is-on { border-color: var(--g); background: var(--g-soft); box-shadow: 0 0 0 1px var(--g); }
+.scpq-voucher { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; max-width: 340px; }
+.scpq-warn { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--gold-soft); color: #6f5414; font-size: 13.5px; }
+
+/* Salvare */
+.scpq-submit { border-top: 1px solid #f0ece4; margin-top: 18px; padding-top: 18px; }
+.scpq-submit .button-hero { width: 100%; justify-content: center; text-align: center; }
+.scpq-error { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: var(--red-soft); color: var(--red); font-weight: 600; }
+.scpq-days .scpq-error { margin: 0; }
+
+/* Confirmare */
+.scpq-done-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+.scpq-done-ok { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--g); color: #fff; font-size: 22px; font-weight: 700; flex: none; }
+.scpq-done-head h2 { margin: 0 0 4px; font-size: 18px; }
+.scpq-done-head p { margin: 0 0 2px; }
+.scpq-done-pay { font-weight: 600; color: var(--ink); }
+.scpq-done .scp-copy { margin: 0 0 12px; }
+.scpq-done-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.scpq-done-actions .button-hero { flex: 1 1 200px; justify-content: center; text-align: center; }
+
+@media (max-width: 600px) {
+	.wrap.scp-admin { padding: 0 6px; }
+	.scpq .scp-panel { padding: 16px 14px; }
+	.scpq-fields { grid-template-columns: 1fr; }
+	.scpq-chip { flex: 1 1 calc(33.333% - 8px); min-width: 0; }
+	.scpq-chips--wide .scpq-chip { flex-basis: 100%; }
+}

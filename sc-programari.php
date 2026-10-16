@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SC Programări Crăciun
  * Description:       Programări online pentru ședințele foto de Crăciun: calendar cu sloturi, bază de date proprie, panou în admin, blocare intervale, emailuri și webhook pentru n8n.
- * Version:           1.2.3
+ * Version:           1.3.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            SimpleAD
@@ -24,8 +24,8 @@ if ( defined( 'SCP_VERSION' ) ) {
 	return;
 }
 
-define( 'SCP_VERSION', '1.2.3' );
-define( 'SCP_DB_VERSION', '5' );
+define( 'SCP_VERSION', '1.3.0' );
+define( 'SCP_DB_VERSION', '7' );
 define( 'SCP_FILE', __FILE__ );
 define( 'SCP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SCP_URL', plugin_dir_url( __FILE__ ) );
@@ -48,9 +48,20 @@ require_once SCP_DIR . 'includes/class-rest.php';
 require_once SCP_DIR . 'includes/class-frontend.php';
 require_once SCP_DIR . 'includes/class-woocommerce.php';
 require_once SCP_DIR . 'includes/class-admin.php';
+require_once SCP_DIR . 'includes/class-privacy.php';
 
 register_activation_hook( __FILE__, array( 'SCP_Install', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'SCP_Install', 'deactivate' ) );
+
+// Compatibil cu tabelele de comenzi WooCommerce (HPOS): folosim doar API-ul de comenzi, nu postmeta direct.
+add_action(
+	'before_woocommerce_init',
+	static function () {
+		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', SCP_FILE, true );
+		}
+	}
+);
 
 add_action(
 	'plugins_loaded',
@@ -62,12 +73,19 @@ add_action(
 		SCP_WooCommerce::init();
 		SCP_Vouchers::init();
 		SCP_SMS::init();
+		SCP_Privacy::init();
+		// „+ Programare” în bara de sus, și pe site (Ștefan e logat când răspunde la telefon).
+		add_action( 'admin_bar_menu', array( 'SCP_Admin', 'admin_bar' ), 70 );
+		add_action( 'wp_head', array( 'SCP_Admin', 'admin_bar_css' ) );
+		add_action( 'admin_head', array( 'SCP_Admin', 'admin_bar_css' ) );
 		add_action( 'scp_webhook_retry', array( 'SCP_Bookings', 'sweep' ), 5 );
-		// Rezervă pentru cazul în care cron-ul serverului întârzie: cel mult o dată la 5 minute, după răspuns.
+		// Expirările rulează din cron (pe live, cronul serverului, în fiecare minut). Doar dacă cronul a rămas
+		// în urmă cu peste 10 minute, le rulează un vizitator, după ce a primit pagina, cel mult o dată la 5 minute.
 		add_action(
 			'shutdown',
 			static function () {
-				if ( wp_doing_cron() || get_transient( 'scp_sweep_lock' ) ) {
+				$next = wp_next_scheduled( 'scp_webhook_retry' );
+				if ( wp_doing_cron() || ! $next || $next > time() - 600 || get_transient( 'scp_sweep_lock' ) ) {
 					return;
 				}
 				set_transient( 'scp_sweep_lock', 1, 300 );
@@ -76,7 +94,7 @@ add_action(
 				}
 				SCP_Bookings::sweep();
 			},
-			0
+			20
 		);
 		if ( is_admin() ) {
 			SCP_Admin::init();
@@ -93,7 +111,7 @@ add_action(
  * pluginul SC Wfolio Gate (SC_WFG_GITHUB_TOKEN), cu condiția să aibă acces și la acest repo.
  */
 // Pe o copie de lucru clonată cu git (Local) nu se caută update-uri: un update din WordPress ar înlocui folderul și ar șterge .git.
-if ( ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && ! is_dir( SCP_DIR . '.git' ) ) {
+if ( ( ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && ! is_dir( SCP_DIR . '.git' ) ) {
 	require_once SCP_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 	if ( class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
 		$scp_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
@@ -107,7 +125,8 @@ if ( ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) && !
 		}
 		$scp_vcs_api = $scp_update_checker->getVcsApi();
 		if ( method_exists( $scp_vcs_api, 'enableReleaseAssets' ) ) {
-			$scp_vcs_api->enableReleaseAssets( '/sc-programari\.zip$/i' );
+			// Doar ZIP-ul din release (fără dev/, tools/): niciodată arhiva întregului repo.
+			$scp_vcs_api->enableReleaseAssets( '/sc-programari\.zip$/i', 2 /* Api::REQUIRE_RELEASE_ASSETS */ );
 		}
 		unset( $scp_github_token, $scp_vcs_api );
 	}

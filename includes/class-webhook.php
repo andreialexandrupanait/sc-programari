@@ -4,9 +4,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Webhook către n8n.
  *
- * Fiecare eveniment se salvează întâi în jurnal (status pending), apoi se trimite la finalul
- * cererii, după ce răspunsul a plecat deja la vizitator. Dacă n8n nu răspunde cu 2xx,
+ * Fiecare eveniment se salvează întâi în jurnal (status pending), apoi pleacă în fundal (Action Scheduler),
+ * în ordinea în care s-a produs, fără să țină pe loc pagina sau plata. Dacă n8n nu răspunde cu 2xx,
  * cron-ul reîncearcă la 5, 15, 60 și 180 de minute. Din admin se poate retrimite manual.
+ * Un rând e „sending” cât timp e trimis, ca două procese să nu-l trimită de două ori.
  *
  * Semnătură: X-SCP-Signature = hex( HMAC-SHA256( secret, X-SCP-Timestamp + "." + body ) )
  */
@@ -25,6 +26,7 @@ class SCP_Webhook {
 		add_action( 'scp_payment_link_sent', fn( $b ) => self::emit( 'booking.payment_link_sent', $b ), 30 );
 		add_action( 'scp_voucher_issued', fn( $v ) => self::emit_voucher( 'voucher.issued', $v ), 30 );
 		add_action( 'scp_webhook_retry', array( __CLASS__, 'retry_due' ) );
+		add_action( 'scp_webhook_deliver', array( __CLASS__, 'deliver_ids' ) );
 		add_action( 'shutdown', array( __CLASS__, 'flush' ), 1 );
 	}
 
@@ -33,38 +35,106 @@ class SCP_Webhook {
 		return '' !== $url && in_array( $event, (array) SCP_Settings::get( 'webhook_events', array() ), true );
 	}
 
+	/** Coloanele din Google Sheet (tab-ul „Programari”), în ordine. Fără diacritice, ca în 2025. */
+	/** Coloanele din tab-ul „Leads”, în ordine. Fără diacritice, ca în 2025. „Slot” e ascunsă (o folosesc formulele). */
+	public static function sheet_columns(): array {
+		return array( 'Inregistrata la', 'Cod', 'Nume', 'Telefon', 'Email', 'Pachet', 'Pret', 'Sedinta (data si ora)', 'Status', 'Plata', 'Sursa', 'Mesaj client', 'Observatii', 'Voucher', 'Termen plata', 'Platita la', 'Link plata', 'Modificata la', 'Slot' );
+	}
+
+	/**
+	 * Rândul unei programări pentru Sheet (și pentru exportul CSV).
+	 * Cheia de potrivire e „Cod”: fiecare programare are rândul ei, actualizat la orice schimbare.
+	 * O programare anulată rămâne în Sheet cu Status „Anulată”; cea nouă de pe aceeași oră are alt cod, deci alt rând.
+	 */
+	public static function sheet_row( array $b ): array {
+		$e      = SCP_Bookings::export( $b );
+		$status = $e['status_label'];
+		if ( 'cancelled' === $b['status'] ) {
+			$status .= 'expired' === $b['cancel_reason'] ? ' (neplătită în termen)' : ' (din admin)';
+		}
+		$fmt = static fn( $v ) => $v ? ( new DateTimeImmutable( (string) $v, SCP_Helpers::tz() ) )->format( 'd.m.Y H:i' ) : '';
+		$row = array(
+			$fmt( $b['created_at'] ),
+			$e['code'],
+			$e['name'],
+			$e['phone'],
+			$e['email'],
+			$e['package_label'],
+			$e['price'],
+			$e['date_ro'] . ' ' . $e['time'],
+			$status,
+			self::sheet_pay_label( $b ),
+			$e['source_label'],
+			$e['message'],
+			$e['notes'],
+			'gift' === $e['discount_source'] ? $e['discount_code'] : '',
+			'pending' === $b['status'] ? $e['pay_by_ro'] : '',
+			$fmt( $b['paid_at'] ?? '' ),
+			'pending' === $b['status'] ? $e['payment_link'] : '',
+			$fmt( $b['updated_at'] ),
+			$b['slot_date'] . ' ' . $b['slot_time'],
+		);
+		return array_combine( self::sheet_columns(), $row );
+	}
+
+	/**
+	 * Valorile fixe din coloana „Plata” (sunt și opțiunile din lista derulantă din Sheet).
+	 * Termenul de plată are coloana lui, deci nu intră în text.
+	 */
+	const SHEET_PAY = array(
+		'paid'     => 'Plătită online',
+		'cash'     => 'Plătită cash la studio',
+		'card'     => 'Plătită cu cardul la studio',
+		'voucher'  => 'Plătită cu voucher',
+		'awaiting' => 'Așteaptă plata online',
+		'studio'   => 'Plată la studio',
+		'unpaid'   => 'Neplătită',
+	);
+
+	private static function sheet_pay_label( array $b ): string {
+		if ( isset( self::SHEET_PAY[ $b['payment_status'] ] ) && SCP_Bookings::is_paid( $b ) ) {
+			return self::SHEET_PAY[ $b['payment_status'] ];
+		}
+		$key = SCP_Bookings::pay_state( $b )['key'];
+		return self::SHEET_PAY[ $key ] ?? self::SHEET_PAY['unpaid'];
+	}
+
+	/**
+	 * Rândul pentru tab-ul „Programari”: copia lui Leads în care Ștefan poate scrie.
+	 * Aceleași coloane ca Leads, cu telefonul apelabil. Coloanele lui (Etapa, Nr. bon/factura,
+	 * Link galerie) nu sunt în rând, deci n8n nu le atinge niciodată.
+	 */
+	public static function sc_row( array $b ): array {
+		$row    = array_map( array( __CLASS__, 'cell_safe' ), self::sheet_row( $b ) );
+		$digits = preg_replace( '/\D+/', '', (string) $row['Telefon'] );
+		if ( '' !== $digits ) {
+			// Fișierul are setări regionale ro_RO, deci separatorul din formulă e „;”.
+			$tel            = str_starts_with( $digits, '0' ) ? '+4' . $digits : '+' . $digits;
+			$row['Telefon'] = '=HYPERLINK("tel:' . $tel . '"; "' . str_replace( '"', '', $row['Telefon'] ) . '")';
+		}
+		return $row;
+	}
+
+	/**
+	 * Un text scris de client care începe cu = + - @ ar fi interpretat ca formulă în Sheet sau Excel
+	 * (de exemplu IMPORTXML, care ar trimite datele altor clienți în afară). Apostroful îl face text.
+	 */
+	public static function cell_safe( $v ) {
+		return is_string( $v ) && '' !== $v && false !== strpos( "=+-@\t\r", $v[0] ) ? "'" . $v : $v;
+	}
+
 	public static function payload( string $event, array $b, string $delivery_id ): array {
-		$e = SCP_Bookings::export( $b );
 		return array(
 			'event'       => $event,
 			'delivery_id' => $delivery_id,
 			'sent_at'     => SCP_Helpers::now()->format( DATE_ATOM ),
 			'site'        => home_url(),
-			'booking'     => $e,
-			// Rând gata de pus în Google Sheets (n8n: Append or Update, coloana de potrivire „Cod”).
-			'sheet'       => array(
-				'Cod'               => $e['code'],
-				'Ora'               => $e['created_time_ro'],
-				'Data'              => $e['created_date_ro'],
-				'Nume'              => $e['name'],
-				'Email'             => $e['email'],
-				'Telefon'           => $e['phone'],
-				'Pachet'            => $e['package_label'],
-				'Pret'              => $e['price'],
-				'Mesaj'             => $e['message'],
-				'Data programarii'  => $e['date_ro'],
-				'Ziua'              => $e['weekday_ro'],
-				'Ora programarii'   => $e['time'],
-				'Status programare' => $e['status_label'],
-				'Status plata'      => $e['payment_status_label'],
-				'Observatii'        => $e['notes'],
-				'Link plata'        => $e['payment_link'],
-				'Pret intreg'       => $e['list_price'],
-				'Reducere'          => $e['discount'],
-				'Voucher'           => 'gift' === $e['discount_source'] ? $e['discount_code'] : '',
-				'Termen plata'      => $e['pay_by_ro'],
-				'Sursa'             => $e['source_label'],
-			),
+			'booking'     => SCP_Bookings::export( $b ),
+			// Rând gata de pus în Google Sheets (n8n: Append or Update Row, coloana de potrivire „Cod”).
+			'tab'         => 'Programari',
+			'sheet'       => self::sheet_row( $b ),
+			// Rândul pentru „SC - Programari” (aceeași potrivire pe „Cod”).
+			'sc'          => self::sc_row( $b ),
 		);
 	}
 
@@ -72,6 +142,18 @@ class SCP_Webhook {
 		if ( ! self::enabled_for( $event ) ) {
 			return;
 		}
+		// Starea din baza de date în acest moment (de ex. „link trimis”, marcat chiar înainte de emailul clientului).
+		if ( ! empty( $b['id'] ) ) {
+			$b = SCP_Bookings::get( (int) $b['id'] ) ?? $b;
+		}
+		self::log_event( $event, $b, true );
+	}
+
+	/**
+	 * Pune evenimentul în jurnal. $now = true îl trimite la finalul cererii; altfel pleacă din cron,
+	 * câte 25 pe rulare (resincronizarea completă nu blochează pagina și nu depășește limitele Google).
+	 */
+	private static function log_event( string $event, array $b, bool $now ): void {
 		global $wpdb;
 		$delivery = SCP_Helpers::uuid();
 		$payload  = self::payload( $event, $b, $delivery );
@@ -86,10 +168,48 @@ class SCP_Webhook {
 				'status'          => 'pending',
 				'attempts'        => 0,
 				'created_at'      => SCP_Helpers::mysql_now(),
-				'next_attempt_at' => SCP_Helpers::mysql_now(),
+				'next_attempt_at' => $now ? SCP_Helpers::now()->modify( '+2 minutes' )->format( 'Y-m-d H:i:s' ) : SCP_Helpers::mysql_now(),
 			)
 		);
-		self::$queue[] = (int) $wpdb->insert_id;
+		if ( $now ) {
+			self::$queue[] = (int) $wpdb->insert_id;
+		}
+	}
+
+	/**
+	 * Retrimite toate programările (toate statusurile) către Sheet: umplerea inițială sau reparat Sheet-ul.
+	 * Fiecare rând se potrivește pe „Cod”, deci nu se dublează nimic.
+	 */
+	public static function resync_all(): int {
+		if ( '' === trim( (string) SCP_Settings::get( 'webhook_url' ) ) ) {
+			return 0;
+		}
+		global $wpdb;
+		$table = SCP_Install::table( 'webhook_log' );
+		// O resincronizare anterioară încă în curs se înlocuiește, ca să nu trimitem de două ori.
+		$wpdb->query( "UPDATE {$table} SET status = 'failed', last_error = 'Înlocuit de o resincronizare nouă', next_attempt_at = NULL WHERE event = 'booking.sync' AND status = 'pending'" ); // phpcs:ignore
+		$n = 0;
+		foreach ( self::all_bookings() as $b ) {
+			self::log_event( 'booking.sync', $b, false );
+			++$n;
+		}
+		return $n;
+	}
+
+	/** Toate rândurile, pentru verificarea de noapte din n8n (rescrie tab-ul cu starea reală). */
+	public static function sheet_snapshot(): array {
+		return array_map( array( __CLASS__, 'sheet_row' ), self::all_bookings() );
+	}
+
+	private static function all_bookings(): array {
+		$all  = array();
+		$page = 1;
+		do {
+			$q   = SCP_Bookings::query( array( 'view' => 'all', 'per_page' => 200, 'page' => $page, 'orderby' => 'slot' ) );
+			$all = array_merge( $all, $q['items'] );
+			++$page;
+		} while ( count( $q['items'] ) === 200 );
+		return $all;
 	}
 
 	public static function emit_voucher( string $event, ?array $v ): void {
@@ -105,12 +225,17 @@ class SCP_Webhook {
 			'sent_at'     => SCP_Helpers::now()->format( DATE_ATOM ),
 			'site'        => home_url(),
 			'voucher'     => $e,
+			'tab'         => 'Vouchere',
 			'sheet'       => array(
 				'Cod voucher'  => $e['code'],
 				'Pachet'       => $e['package_label'],
 				'Valoare'      => $e['value'],
-				'Cumparator'   => $e['buyer_name'],
-				'Email'        => $e['buyer_email'],
+				'Cumparator'   => self::cell_safe( $e['buyer_name'] ),
+				'Email'        => self::cell_safe( $e['buyer_email'] ),
+				'Telefon'      => self::cell_safe( $e['buyer_phone'] ),
+				'Pentru'       => self::cell_safe( $e['recipient_name'] ),
+				'Email destinatar'   => self::cell_safe( $e['recipient_email'] ),
+				'Telefon destinatar' => self::cell_safe( $e['recipient_phone'] ),
 				'Comanda'      => $e['order_id'],
 				'Valabil pana' => $e['expires_on'] ? SCP_Helpers::date_ro( $e['expires_on'] ) : '',
 				'Status'       => $e['status_label'],
@@ -133,18 +258,27 @@ class SCP_Webhook {
 		self::$queue[] = (int) $wpdb->insert_id;
 	}
 
-	/** Trimite evenimentele din această cerere, după ce vizitatorul a primit răspunsul. */
+	/**
+	 * Evenimentele din această cerere pleacă într-un singur job în fundal, în ordine.
+	 * Fără Action Scheduler (WooCommerce oprit) se trimit pe loc, ca înainte.
+	 */
 	public static function flush(): void {
 		if ( ! self::$queue ) {
 			return;
 		}
-		if ( function_exists( 'fastcgi_finish_request' ) && ! is_admin() && ! wp_doing_cron() ) {
-			fastcgi_finish_request();
-		}
-		foreach ( array_unique( self::$queue ) as $id ) {
-			self::deliver( $id );
-		}
+		$ids         = array_values( array_unique( self::$queue ) );
 		self::$queue = array();
+		if ( function_exists( 'as_enqueue_async_action' ) && apply_filters( 'scp_async', true ) ) {
+			as_enqueue_async_action( 'scp_webhook_deliver', array( $ids ), 'scp' );
+			return;
+		}
+		self::deliver_ids( $ids );
+	}
+
+	public static function deliver_ids( $ids ): void {
+		foreach ( (array) $ids as $id ) {
+			self::deliver( (int) $id );
+		}
 	}
 
 	/** @return array{ok:bool,code:int|null,error:string} */
@@ -159,6 +293,18 @@ class SCP_Webhook {
 		if ( ! $url ) {
 			return array( 'ok' => false, 'code' => null, 'error' => 'Nu există adresă de webhook în setări.' );
 		}
+		// Preluare atomică: un rând deja în curs de trimitere (de alt proces) nu se trimite încă o dată.
+		$claimed = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table} SET status = 'sending', next_attempt_at = %s WHERE id = %d AND ( status <> 'sending' OR next_attempt_at <= %s )",
+				SCP_Helpers::now()->modify( '+10 minutes' )->format( 'Y-m-d H:i:s' ),
+				$log_id,
+				SCP_Helpers::mysql_now()
+			)
+		);
+		if ( 1 !== (int) $claimed ) {
+			return array( 'ok' => false, 'code' => null, 'error' => 'Se trimite deja.' );
+		}
 
 		$body = (string) $row['payload'];
 		$ts   = (string) time();
@@ -167,7 +313,7 @@ class SCP_Webhook {
 		$res = wp_remote_post(
 			$url,
 			array(
-				'timeout'   => 8,
+				'timeout'   => 5,
 				'blocking'  => true,
 				'headers'   => array(
 					'Content-Type'    => 'application/json; charset=utf-8',
@@ -176,6 +322,8 @@ class SCP_Webhook {
 					'X-SCP-Delivery'  => $row['delivery_id'],
 					'X-SCP-Timestamp' => $ts,
 					'X-SCP-Signature' => $sig,
+					// Pentru Header Auth în n8n. Cheia aceasta doar scrie în Sheet; citirea (/sheet) are cheia ei.
+					'X-SCP-Key'       => (string) SCP_Settings::get( 'webhook_secret' ),
 				),
 				'body'      => $body,
 			)
@@ -210,14 +358,34 @@ class SCP_Webhook {
 		return array( 'ok' => $ok, 'code' => $code, 'error' => $error );
 	}
 
+	/**
+	 * Reîncercările și resincronizarea. Cel mult ~40 de secunde pe rulare (cronul rulează în fiecare minut,
+	 * iar rulările nu au voie să se suprapună); se oprește după 3 eșecuri la rând, când n8n e căzut.
+	 */
 	public static function retry_due(): void {
 		global $wpdb;
-		$table = SCP_Install::table( 'webhook_log' );
-		$ids   = $wpdb->get_col(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE status = 'pending' AND next_attempt_at <= %s ORDER BY id LIMIT 25", SCP_Helpers::mysql_now() )
-		);
-		foreach ( $ids as $id ) {
-			self::deliver( (int) $id );
+		if ( ! add_option( 'scp_webhook_lock', time(), '', false ) ) {
+			if ( (int) get_option( 'scp_webhook_lock' ) > time() - 120 ) {
+				return;
+			}
+			update_option( 'scp_webhook_lock', time(), false );
+		}
+		try {
+			$table = SCP_Install::table( 'webhook_log' );
+			$ids   = $wpdb->get_col(
+				$wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','sending') AND next_attempt_at <= %s ORDER BY id LIMIT 60", SCP_Helpers::mysql_now() )
+			);
+			$start = microtime( true );
+			$fails = 0;
+			foreach ( $ids as $id ) {
+				if ( microtime( true ) - $start > 40 || $fails >= 3 ) {
+					break;
+				}
+				$r     = self::deliver( (int) $id );
+				$fails = $r['ok'] || null === $r['code'] && 'Se trimite deja.' === $r['error'] ? 0 : $fails + 1;
+			}
+		} finally {
+			delete_option( 'scp_webhook_lock' );
 		}
 	}
 
@@ -234,6 +402,12 @@ class SCP_Webhook {
 			'slot_time'            => SCP_Settings::times()[0] ?? '11:00',
 			'package'              => $pkg,
 			'price'                => $packages[ $pkg ]['price'] ?? 0,
+			'list_price'           => $packages[ $pkg ]['price'] ?? 0,
+			'discount'             => 0,
+			'discount_code'        => '',
+			'discount_source'      => '',
+			'pay_by'               => null,
+			'cancel_reason'        => '',
 			'name'                 => 'Test Webhook',
 			'email'                => 'test@example.com',
 			'phone'                => '0700 000 000',
