@@ -1058,8 +1058,8 @@ class SCP_Admin {
 			<?php wp_nonce_field( 'scp_save_settings' ); ?>
 			<input type="hidden" name="action" value="scp_save_settings">
 
-			<nav class="scp-tabs">
-				<a href="#program">Program</a><a href="#pachete">Pachete</a><a href="#studio">Studio</a><a href="#emailuri">Emailuri</a><a href="#plata">Plată</a><a href="#webhook">Webhook n8n</a>
+			<nav class="scp-tabs" role="tablist" aria-label="Secțiuni setări">
+				<a href="#program" role="tab">Program</a><a href="#pachete" role="tab">Pachete</a><a href="#plata" role="tab">Plată și vouchere</a><a href="#emailuri" role="tab">Emailuri</a><a href="#studio" role="tab">Studio</a><a href="#webhook" role="tab">Webhook n8n</a>
 			</nav>
 
 			<section class="scp-panel" id="program">
@@ -1099,7 +1099,10 @@ class SCP_Admin {
 				<p class="description">Câte o caracteristică pe rând. Prețul se copiază în programare în momentul rezervării; dacă îl schimbi aici, programările existente rămân cu prețul lor.</p>
 				<div class="scp-packages-edit">
 					<?php foreach ( array_merge( $packages, array( array( 'key' => '', 'label' => '', 'price' => '', 'desc' => '' ) ) ) as $i => $p ) : ?>
-						<div class="scp-pkg-edit<?php echo '' === $p['key'] ? ' is-new' : ''; ?>">
+						<?php if ( '' === $p['key'] ) : ?>
+							<button type="button" class="scp-pkg-add" data-pkg-add>+ Adaugă un pachet</button>
+						<?php endif; ?>
+						<div class="scp-pkg-edit<?php echo '' === $p['key'] ? ' is-new' : ''; ?>"<?php echo '' === $p['key'] ? ' hidden' : ''; ?>>
 							<label><span>Nume</span><input type="text" name="packages[<?php echo (int) $i; ?>][label]" value="<?php echo esc_attr( $p['label'] ); ?>" placeholder="<?php echo '' === $p['key'] ? 'Pachet nou (opțional)' : ''; ?>"></label>
 							<label><span>Preț (lei)</span><input type="number" min="0" step="1" name="packages[<?php echo (int) $i; ?>][price]" value="<?php echo esc_attr( (string) $p['price'] ); ?>"></label>
 							<label class="scp-wide"><span>Ce include</span><textarea rows="3" name="packages[<?php echo (int) $i; ?>][desc]"><?php echo esc_textarea( $p['desc'] ); ?></textarea></label>
@@ -1143,6 +1146,7 @@ class SCP_Admin {
 					'client_confirmation' => 'Confirmare fără plată online (programări din admin)',
 					'client_studio'       => 'Confirmare cu plata la studio, cash sau card',
 					'admin_new'           => 'Alertă programare nouă (către voi)',
+					'voucher_issued'      => 'Voucher cumpărat: codurile către cumpărător',
 					'payment_link'        => 'Link de plată trimis manual',
 					'rescheduled'         => 'Programare mutată',
 					'cancelled'           => 'Programare anulată',
@@ -1222,7 +1226,9 @@ class SCP_Admin {
 							<p class="description">Pasul de checkout CartFlows pentru vouchere. Linkurile <code><?php echo esc_html( strtok( (string) ( $s['voucher_url'] ?? '' ), '?' ) ); ?>?pachet=foto</code> și <code>?pachet=foto_plus</code> pun direct în coș voucherul pachetului respectiv, fără să mai treacă prin pagina produsului.</p>
 							<p><label><span class="scp-map-label">Începutul codului</span> <input type="text" class="small-text scp-mono" style="width:9em" maxlength="10" name="voucher_prefix" value="<?php echo esc_attr( (string) ( $s['voucher_prefix'] ?? 'CHELMU' ) ); ?>"></label></p>
 							<p class="description">Codurile arată așa: <code><?php echo esc_html( ( $s['voucher_prefix'] ?? 'CHELMU' ) ?: 'CHELMU' ); ?>-BRAD-K7MP9Q</code>, cu un cuvânt de Crăciun ales la întâmplare (<?php echo esc_html( strtolower( implode( ', ', SCP_Vouchers::CODE_WORDS ) ) ); ?>) și 6 caractere unice. În formular se pot scrie și cu litere mici sau fără cratime.</p>
-							<p><label><input type="checkbox" name="create_voucher_product" value="1"> Creează acum produsul „Voucher ședință foto de Crăciun”, cu câte o variantă pentru fiecare pachet, la prețul întreg, și leagă-l aici</label></p>
+							<?php if ( ! array_filter( array_map( 'intval', $vmap ) ) ) : ?>
+								<p><label><input type="checkbox" name="create_voucher_product" value="1"> Nu ai încă un produs voucher? Bifează și salvează: pluginul creează produsul „Voucher ședință foto de Crăciun”, cu câte o variantă pentru fiecare pachet, la prețul întreg, și îl leagă aici.</label></p>
+							<?php endif; ?>
 						<?php endif; ?>
 					</td></tr>
 				</table>
@@ -1260,7 +1266,7 @@ class SCP_Admin {
 				</table>
 			</section>
 
-			<p class="submit scp-sticky-submit"><button class="button button-primary button-large">Salvează setările</button></p>
+			<div class="scp-sticky-submit"><button class="button button-primary button-large">Salvează setările</button><span class="scp-dirty" hidden>Ai modificări nesalvate</span></div>
 		</form>
 		<?php
 		self::footer();
@@ -1322,8 +1328,14 @@ class SCP_Admin {
 		}
 
 		$emails = array();
+		$old_emails = (array) SCP_Settings::get( 'emails', array() );
 		foreach ( SCP_Settings::default_emails() as $key => $def ) {
-			$in             = (array) ( $p['emails'][ $key ] ?? array() );
+			if ( ! isset( $p['emails'][ $key ] ) ) {
+				// Nu e în formular: rămâne cum era (altfel s-ar opri fără să știe nimeni).
+				$emails[ $key ] = $old_emails[ $key ] ?? $def;
+				continue;
+			}
+			$in             = (array) $p['emails'][ $key ];
 			$emails[ $key ] = array(
 				'enabled' => empty( $in['enabled'] ) ? 0 : 1,
 				'subject' => sanitize_text_field( $in['subject'] ?? $def['subject'] ),

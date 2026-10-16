@@ -411,3 +411,26 @@
 	.scp-cal-admin.has-side .scp-cal-backdrop { display: block; position: fixed; inset: 0; z-index: 100000; background: rgba(20, 18, 12, .35); }
 	.scp-side-close { font-size: 28px; }
 }
+
+/* Setări: taburi reale, carduri de pachete care nu mai ies din chenar, bara de salvare */
+.scp-tabs a.is-active { background: var(--g); border-color: var(--g); color: #fff; font-weight: 600; }
+.scp-settings section.scp-panel[hidden] { display: none; }
+.scp-settings section.scp-panel { margin-bottom: 0; }
+.scp-pkg-edit { grid-template-columns: minmax(0, 1fr) 96px; align-content: start; }
+.scp-pkg-edit label { min-width: 0; }
+.scp-pkg-edit input[type="text"], .scp-pkg-edit input[type="number"], .scp-pkg-edit textarea { width: 100%; max-width: none; box-sizing: border-box; margin: 0; }
+.scp-pkg-edit textarea { min-height: 84px; resize: vertical; }
+.scp-pkg-edit .scp-inline-check { align-items: center; gap: 6px; color: #8a8374; }
+.scp-pkg-edit .scp-inline-check input { margin: 0; }
+.scp-pkg-add { border: 1px dashed #c9c2b3; border-radius: 8px; background: #fff; color: var(--g); font: inherit; font-weight: 600; cursor: pointer; min-height: 120px; }
+.scp-pkg-add:hover { border-color: var(--g); background: var(--g-soft); }
+.scp-sticky-submit { display: flex; align-items: center; gap: 14px; padding: 12px 0 !important; margin-top: 14px; }
+.scp-dirty { color: #8a6a22; font-weight: 600; font-size: 13px; }
+.scp-dirty::before { content: "●"; margin-right: 6px; color: var(--gold); }
+@media (max-width: 782px) {
+	.scp-settings .form-table th { width: auto; }
+	.scp-packages-edit { grid-template-columns: minmax(0, 1fr); }
+	.scp-tabs { flex-wrap: nowrap; overflow-x: auto; }
+	.scp-tabs a { white-space: nowrap; }
+}
+.scp-pkg-edit[hidden] { display: none; }

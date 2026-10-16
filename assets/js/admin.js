@@ -511,6 +511,47 @@
 				else { input.select(); document.execCommand('copy'); done(); }
 			});
 		});
+		// Setări: o singură secțiune vizibilă; tabul ales rămâne după salvare (hash + memorie locală).
+		var settings = document.querySelector('form.scp-settings');
+		if (settings) {
+			var tabs = settings.querySelectorAll('.scp-tabs a');
+			var show = function (id) {
+				if (!settings.querySelector('section#' + id)) id = 'program';
+				settings.querySelectorAll('section.scp-panel').forEach(function (s) { s.hidden = s.id !== id; });
+				tabs.forEach(function (a) {
+					var on = a.getAttribute('href') === '#' + id;
+					a.classList.toggle('is-active', on);
+					a.setAttribute('aria-selected', on ? 'true' : 'false');
+				});
+				try { window.localStorage.setItem('scp_settings_tab', id); } catch (e) { /* ignorăm */ }
+			};
+			tabs.forEach(function (a) {
+				a.addEventListener('click', function (e) {
+					e.preventDefault();
+					var id = a.getAttribute('href').slice(1);
+					history.replaceState(null, '', '#' + id);
+					show(id);
+					window.scrollTo({ top: 0 });
+				});
+			});
+			var start = window.location.hash.slice(1);
+			if (!start) { try { start = window.localStorage.getItem('scp_settings_tab') || ''; } catch (e) { start = ''; } }
+			show(start || 'program');
+			// Modificări nesalvate: semn pe bara de jos și avertizare la plecarea de pe pagină.
+			var dirty = false, flag = settings.querySelector('.scp-dirty');
+			var mark = function () { if (!dirty) { dirty = true; if (flag) flag.hidden = false; } };
+			settings.addEventListener('input', mark);
+			settings.addEventListener('change', mark);
+			settings.addEventListener('submit', function () { dirty = false; });
+			window.addEventListener('beforeunload', function (e) { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+			settings.querySelectorAll('[data-pkg-add]').forEach(function (b) {
+				b.addEventListener('click', function () {
+					var card = b.nextElementSibling;
+					if (card) { card.hidden = false; var f = card.querySelector('input'); if (f) f.focus(); }
+					b.remove();
+				});
+			});
+		}
 		document.querySelectorAll('[data-reveal]').forEach(function (b) {
 			b.addEventListener('click', function () {
 				var input = document.querySelector(b.getAttribute('data-reveal'));
