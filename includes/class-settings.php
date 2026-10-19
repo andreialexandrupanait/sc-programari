@@ -51,7 +51,8 @@ class SCP_Settings {
 			'track_fbq'          => 0,
 			'pay_hours'                => 48,
 			'pay_before_session_hours' => 2,
-			'pay_reminder_hours'       => 12,
+			'pay_reminders'            => '24, 12, 3',
+			'last_call_minutes'        => 30,
 			'early_enabled'            => 1,
 			'early_until'              => '2026-11-15',
 			'early_packages'           => array( 'foto' ),
@@ -103,6 +104,18 @@ class SCP_Settings {
 				'enabled' => 1,
 				'subject' => 'Rezervarea din {data} expiră curând',
 				'body'    => "Bună, {nume}!\n\nRezervarea ta pentru {ziua}, {data}, ora {ora}, încă așteaptă plata. Dacă plata nu ajunge până {termen_plata}, rezervarea se anulează automat.\n\nDacă te-ai răzgândit sau ai nevoie de altă oră, ne găsești la {telefon_studio}.\n\nCu drag,\n{studio}",
+			),
+			'payment_last_call'   => array(
+				'enabled' => 1,
+				'subject' => 'Mai ai puțin timp să plătești ora din {data}',
+				'body'    => "Bună, {nume}!
+
+Rezervarea ta pentru {ziua}, {data}, ora {ora}, se anulează automat dacă plata nu ajunge până {termen_plata}. Plătește acum, ca ora aleasă de tine să nu ajungă la altă familie.
+
+Dacă ai nevoie de ajutor, ne găsești la {telefon_studio}.
+
+Cu drag,
+{studio}",
 			),
 			'expired'             => array(
 				'enabled' => 1,

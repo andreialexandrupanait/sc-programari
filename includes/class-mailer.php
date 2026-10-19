@@ -6,7 +6,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class SCP_Mailer {
 
-	const JOBS = array( 'on_created', 'on_rescheduled', 'on_cancelled', 'on_paid', 'on_studio', 'on_reminder' );
+	const JOBS = array( 'on_created', 'on_rescheduled', 'on_cancelled', 'on_paid', 'on_studio', 'on_reminder', 'on_last_call' );
 
 	public static function init(): void {
 		add_action( 'scp_booking_created', static fn( $b ) => self::defer( 'on_created', $b ), 20 );
@@ -106,6 +106,14 @@ class SCP_Mailer {
 		if ( $b['email'] ) {
 			self::send_template( 'payment_reminder', $b, $b['email'], array( 'button' => self::pay_button( $b ) ) );
 		}
+	}
+
+	/** Ultimul apel pe email: doar ca rezervă, când SMS-ul nu poate pleca sau nu ajunge (vezi SCP_SMS::on_last_call). */
+	public static function on_last_call( array $b ): bool {
+		if ( ! $b['email'] || 'pending' !== $b['status'] || SCP_Bookings::is_paid( $b ) || empty( $b['pay_by'] ) || SCP_Helpers::mysql_now() >= $b['pay_by'] ) {
+			return false;
+		}
+		return (bool) self::send_template( 'payment_last_call', $b, $b['email'], array( 'button' => self::pay_button( $b ) ) );
 	}
 
 	public static function send_payment_link( array $b ): bool|WP_Error {

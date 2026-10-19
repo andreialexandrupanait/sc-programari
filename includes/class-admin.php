@@ -1140,6 +1140,7 @@ class SCP_Admin {
 					'client_pending'      => 'Rezervare de pe site, cu link de plată',
 					'payment_received'    => 'Plată primită, programare confirmată',
 					'payment_reminder'    => 'Reamintire plată',
+					'payment_last_call'   => 'Ultimul apel la plată (rezervă pentru SMS)',
 					'session_reminder_day'  => 'Reamintire ședință cu o zi înainte (rezervă pentru SMS)',
 					'session_reminder_hour' => 'Reamintire ședință cu o oră înainte (rezervă pentru SMS)',
 					'expired'             => 'Rezervare anulată automat (neplătită)',
@@ -1194,7 +1195,8 @@ class SCP_Admin {
 						<input type="number" min="0" max="336" name="pay_hours" id="pay_hours" value="<?php echo esc_attr( (string) $s['pay_hours'] ); ?>" class="small-text"> ore de la rezervare
 						<p class="description">Rezervările de pe site au statusul „Așteaptă plata” și se anulează automat dacă plata nu ajunge în acest termen. 0 = fără termen (rezervările sunt confirmate direct). Dacă ședința are loc înainte de expirarea termenului, rezervarea nu se mai anulează automat: clientul primește linkul de plată și poate plăti online sau la studio.</p>
 					</td></tr>
-					<tr><th><label for="pay_reminder_hours">Reamintire</label></th><td><input type="number" min="0" max="168" name="pay_reminder_hours" id="pay_reminder_hours" value="<?php echo esc_attr( (string) $s['pay_reminder_hours'] ); ?>" class="small-text"> ore înainte de expirare <p class="description">0 = fără email de reamintire.</p></td></tr>
+					<tr><th><label for="pay_reminders">Reamintiri pe email</label></th><td><input type="text" name="pay_reminders" id="pay_reminders" value="<?php echo esc_attr( (string) $s['pay_reminders'] ); ?>" class="regular-text" placeholder="24, 12, 3"> ore înainte de expirare <p class="description">Câte un email la fiecare interval, de exemplu „24, 12, 3”. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. Gol = fără reamintiri.</p></td></tr>
+					<tr><th><label for="last_call_minutes">Ultimul apel</label></th><td><input type="number" min="0" max="180" name="last_call_minutes" id="last_call_minutes" value="<?php echo esc_attr( (string) $s['last_call_minutes'] ); ?>" class="small-text"> minute înainte de expirare <p class="description">SMS: „plătește până la …, ca ora să nu ajungă la altă familie”. Emailul „Ultimul apel” pleacă doar dacă SMS-ul nu poate pleca sau nu ajunge. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. 0 = fără.</p></td></tr>
 					<tr><th>Reducere de început de sezon</th><td>
 						<p><label><input type="checkbox" name="early_enabled" value="1" <?php checked( ! empty( $s['early_enabled'] ) ); ?>> Activă</label></p>
 						<p><label><input type="number" min="0" step="1" name="early_amount" value="<?php echo esc_attr( (string) $s['early_amount'] ); ?>" class="small-text"> lei reducere</label>
@@ -1375,7 +1377,8 @@ class SCP_Admin {
 				'webhook_events'   => array_values( array_intersect( $allowed_events, (array) ( $p['webhook_events'] ?? array() ) ) ),
 				'track_fbq'        => empty( $p['track_fbq'] ) ? 0 : 1,
 				'pay_hours'                => max( 0, min( 336, (int) ( $p['pay_hours'] ?? 48 ) ) ),
-				'pay_reminder_hours'       => max( 0, min( 168, (int) ( $p['pay_reminder_hours'] ?? 12 ) ) ),
+				'pay_reminders'            => implode( ', ', array_slice( array_values( array_unique( array_filter( array_map( 'intval', preg_split( '/[^0-9]+/', (string) ( $p['pay_reminders'] ?? '' ) ) ), static fn( $h ) => $h > 0 && $h <= 336 ) ) ), 0, 6 ) ),
+				'last_call_minutes'        => max( 0, min( 180, (int) ( $p['last_call_minutes'] ?? 30 ) ) ),
 				'early_enabled'            => empty( $p['early_enabled'] ) ? 0 : 1,
 				'early_until'              => SCP_Helpers::is_date( (string) ( $p['early_until'] ?? '' ) ) ? $p['early_until'] : '',
 				'early_amount'             => max( 0, (float) ( $p['early_amount'] ?? 0 ) ),

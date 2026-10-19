@@ -450,6 +450,12 @@ class SCP_Bookings {
 		if ( array_key_exists( 'pay_by', $changes ) ) {
 			$set['pay_by'] = $changes['pay_by'];
 			$set['reminder_sent_at'] = null;
+			// termen nou: reamintirile și ultimul apel pleacă din nou, după noul termen
+			if ( ! empty( $before['meta']['last_call_at'] ) || ! empty( $before['meta']['reminded'] ) ) {
+				$meta = json_decode( (string) ( $set['meta'] ?? wp_json_encode( $before['meta'] ) ), true );
+				unset( $meta['last_call_at'], $meta['reminded'] );
+				$set['meta'] = wp_json_encode( $meta ?: new stdClass() );
+			}
 		}
 
 		$date = $before['slot_date'];
@@ -648,30 +654,116 @@ class SCP_Bookings {
 			}
 		}
 
-		$hours = (int) SCP_Settings::get( 'pay_reminder_hours', 0 );
-		if ( $hours > 0 ) {
-			$limit = SCP_Helpers::now()->modify( "+{$hours} hours" )->format( 'Y-m-d H:i:s' );
-			// Doar dacă termenul total a fost mai lung decât fereastra de reamintire (altfel ar pleca imediat după rezervare).
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT id FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL AND pay_by > %s AND pay_by <= %s AND reminder_sent_at IS NULL
-					 AND TIMESTAMPDIFF(MINUTE, created_at, pay_by) > %d AND payment_status NOT IN (" . SCP_Helpers::paid_sql() . ") LIMIT 50",
-					$now,
-					$limit,
-					( $hours + 1 ) * 60
-				),
-				ARRAY_A
-			);
-			foreach ( $rows as $r ) {
-				$wpdb->update( $t, array( 'reminder_sent_at' => $now ), array( 'id' => (int) $r['id'] ) );
-				$b = self::get( (int) $r['id'] );
-				if ( $b ) {
-					do_action( 'scp_payment_reminder', $b );
-					++$done['reminded'];
-				}
+		$done['reminded']  = self::nudges( 'reminder' );
+		$done['last_call'] = self::nudges( 'last_call' );
+		return $done;
+	}
+
+	/** Orele dinaintea expirării la care pleacă emailurile de reamintire (Setări → Reamintiri), descrescător. */
+	public static function reminder_hours(): array {
+		$out = array();
+		foreach ( preg_split( '/[^0-9]+/', (string) SCP_Settings::get( 'pay_reminders', '' ) ) as $h ) {
+			if ( (int) $h > 0 && (int) $h <= 336 ) {
+				$out[] = (int) $h;
 			}
 		}
-		return $done;
+		$out = array_values( array_unique( $out ) );
+		rsort( $out );
+		return array_slice( $out, 0, 6 );
+	}
+
+	/**
+	 * Reamintirile pentru programările neplătite, la momentele din nudge_due():
+	 * - reminder: emailuri la fiecare interval din reminder_hours(), marcate în meta.reminded;
+	 * - last_call: ultimul apel („plătește până la …, ca ora să nu ajungă la altă familie”), pe SMS, cu emailul doar ca rezervă; marcat în meta.last_call_at.
+	 * Marcajele se golesc la prelungirea termenului, ca reamintirile să pornească din nou.
+	 */
+	private static function nudges( string $kind ): int {
+		global $wpdb;
+		$steps = 'reminder' === $kind ? array_map( static fn( $h ) => $h * 60, self::reminder_hours() ) : array_filter( array( (int) SCP_Settings::get( 'last_call_minutes', 0 ) ) );
+		if ( ! $steps ) {
+			return 0;
+		}
+		$t   = self::table();
+		$now = SCP_Helpers::now();
+		// Mutarea peste noapte aduce un moment cel mult cu ~11 ore mai devreme; 12 ore în plus acoperă tot.
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT id FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL AND pay_by > %s AND pay_by <= %s AND payment_status NOT IN (" . SCP_Helpers::paid_sql() . ') ORDER BY pay_by LIMIT 100',
+				$now->format( 'Y-m-d H:i:s' ),
+				$now->modify( '+' . ( max( $steps ) + 12 * 60 ) . ' minutes' )->format( 'Y-m-d H:i:s' )
+			)
+		);
+		$n = 0;
+		foreach ( $ids as $id ) {
+			$b = self::get( (int) $id );
+			if ( ! $b || ( 'last_call' === $kind && ! empty( $b['meta']['last_call_at'] ) ) ) {
+				continue;
+			}
+			$sent    = array_map( 'intval', (array) ( $b['meta']['reminded'] ?? array() ) );
+			$created = new DateTimeImmutable( (string) $b['created_at'], SCP_Helpers::tz() );
+			if ( 'reminder' === $kind && ! isset( $b['meta']['reminded'] ) && ! empty( $b['reminder_sent_at'] ) ) {
+				// programări de dinainte de 1.3.11: reamintirea deja trimisă acoperă momentele de până atunci
+				$at   = new DateTimeImmutable( (string) $b['reminder_sent_at'], SCP_Helpers::tz() );
+				$sent = array_values( array_filter( $steps, fn( $m ) => self::nudge_due( $b, $m ) <= $at ) );
+			}
+			$fire    = false;
+			$mark    = array();
+			foreach ( $steps as $m ) {
+				if ( in_array( $m, $sent, true ) ) {
+					continue;
+				}
+				$due = self::nudge_due( $b, $m );
+				if ( $now < $due ) {
+					continue;
+				}
+				// toate momentele trecute se marchează (fără rafale), dar pleacă un singur mesaj și doar dacă nu e chiar lângă rezervare
+				$mark[] = $m;
+				$fire   = $fire || $due >= $created->modify( '+30 minutes' );
+			}
+			if ( ! $mark ) {
+				continue;
+			}
+			if ( $fire && self::payment_in_progress( (int) $id ) ) {
+				continue;
+			}
+			$meta = $b['meta'];
+			$set  = array();
+			if ( 'reminder' === $kind ) {
+				$meta['reminded'] = array_values( array_unique( array_merge( $sent, $mark ) ) );
+				if ( $fire ) {
+					$set['reminder_sent_at'] = SCP_Helpers::mysql_now();
+				}
+			} else {
+				$meta['last_call_at'] = SCP_Helpers::mysql_now();
+			}
+			$set['meta'] = wp_json_encode( $meta );
+			$wpdb->update( $t, $set, array( 'id' => (int) $id ) );
+			if ( $fire ) {
+				$b['meta'] = $meta;
+				do_action( 'reminder' === $kind ? 'scp_payment_reminder' : 'scp_payment_last_call', $b );
+				++$n;
+			}
+		}
+		return $n;
+	}
+
+	/** Momentul unei reamintiri: cu $minutes înainte de termen, dar nu noaptea (22–08): atunci la 08:00, dacă mai e timp, sau la 21:30 cu o seară înainte. */
+	public static function nudge_due( array $b, int $minutes ): DateTimeImmutable {
+		$pay_by = new DateTimeImmutable( (string) $b['pay_by'], SCP_Helpers::tz() );
+		$due    = $pay_by->modify( '-' . max( 1, $minutes ) . ' minutes' );
+		$h      = (int) $due->format( 'G' );
+		if ( $h >= 22 ) {
+			$due = $due->setTime( 21, 30 );
+		} elseif ( $h < 8 ) {
+			$morning = $due->setTime( 8, 0 );
+			$due     = $morning <= $pay_by->modify( '-10 minutes' ) ? $morning : $due->modify( '-1 day' )->setTime( 21, 30 );
+		}
+		return $due;
+	}
+
+	public static function last_call_due( array $b ): DateTimeImmutable {
+		return self::nudge_due( $b, (int) SCP_Settings::get( 'last_call_minutes', 30 ) );
 	}
 
 	public static function payment_url( array $b ): string {

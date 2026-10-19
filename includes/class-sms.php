@@ -18,7 +18,7 @@ class SCP_SMS {
 
 	const OPTION   = 'scp_sms_settings';
 	const GROUP    = 'scp-sms';
-	const TYPES    = array( 'created', 'paid', 'moved', 'remind_day', 'remind_hour' );
+	const TYPES    = array( 'created', 'pay_reminder', 'paid', 'moved', 'remind_day', 'remind_hour' );
 	const BACKOFF  = array( 2, 10, 30, 60, 120 ); // minute între încercări
 	const MAX_TRY  = 5;
 
@@ -41,6 +41,7 @@ class SCP_SMS {
 			'alert_emails'     => '',
 			'templates'        => array(
 				'created'     => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Ti-am rezervat sedinta foto {ziua} {data}, ora {ora}. Plateste {termen} ca sa pastrezi ora: {link}' ),
+				'pay_reminder' => array( 'enabled' => 1, 'body' => '{prenume}, plateste {termen}, ca ora ta de {ziua} {data}, {ora} sa nu ajunga la alta familie: {link} - Stefan Chelmu' ),
 				'paid'        => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Plata a ajuns, sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'voucher'     => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata cu voucherul tau: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'studio'      => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Plata la studio, cash sau card.' ),
@@ -115,6 +116,7 @@ class SCP_SMS {
 		add_action( 'scp_booking_studio', array( __CLASS__, 'on_paid' ), 40 );
 		add_action( 'scp_booking_cancelled', array( __CLASS__, 'on_cancelled' ), 40, 1 );
 		add_action( 'scp_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ), 40, 3 );
+		add_action( 'scp_payment_last_call', array( __CLASS__, 'on_last_call' ), 40 );
 
 		add_action( 'scp_sms_send', array( __CLASS__, 'job_send' ), 10, 3 );
 		add_action( 'scp_sms_check', array( __CLASS__, 'job_check' ), 10, 1 );
@@ -178,6 +180,31 @@ class SCP_SMS {
 		if ( 'pending' === $b['status'] ) {
 			self::queue( $b, 'created' );
 		}
+	}
+
+	/** Ultimul apel la plată (din SCP_Bookings::sweep). După o prelungire a termenului, rândul din jurnal se refolosește. */
+	public static function on_last_call( array $b ): void {
+		if ( 'pending' !== $b['status'] || self::is_paid( $b ) ) {
+			return;
+		}
+		// SMS-ul nu poate pleca deloc: trimitem direct emailul de rezervă
+		$why = '';
+		if ( ! self::template_on( 'pay_reminder' ) ) {
+			$why = 'SMS-ul de ultim apel e oprit';
+		} elseif ( self::get( 'test_mode' ) && ! self::is_test_number( (string) $b['phone'] ) ) {
+			$why = 'Mod test';
+		} elseif ( ! SCP_Helpers::is_ro_mobile( (string) $b['phone'] ) ) {
+			$why = 'Număr din afara României';
+		}
+		if ( $why ) {
+			SCP_Mailer::on_last_call( $b );
+			return;
+		}
+		$row = self::row( (int) $b['id'], 'pay_reminder' );
+		if ( $row && ! in_array( $row['status'], array( 'scheduled', 'queued', 'retry' ), true ) ) {
+			self::reset_row( $row, 'termen prelungit' );
+		}
+		self::queue( $b, 'pay_reminder' );
 	}
 
 	public static function on_paid( array $b ): void {
@@ -468,7 +495,7 @@ class SCP_SMS {
 		$txt  = self::gsm( strtr( $tpl, $vars ) );
 		if ( self::length( $txt ) > 160 ) {
 			$vars['{prenume}'] = '';
-			$txt               = self::gsm( preg_replace( '/^Salut,\s*!\s*/', 'Salut! ', strtr( $tpl, $vars ) ) );
+			$txt               = self::gsm( preg_replace( array( '/^(Salut|Buna|Bun[aă] ziua),\s*!\s*/u', '/^,\s*/' ), array( '$1! ', '' ), strtr( $tpl, $vars ) ) );
 		}
 		while ( self::length( $txt ) > 160 ) {
 			$txt = rtrim( mb_substr( $txt, 0, -1 ) );
@@ -522,6 +549,8 @@ class SCP_SMS {
 			$skip = 'Programarea a fost mutată';
 		} elseif ( 'created' === $type && ( 'pending' !== $b['status'] || self::is_paid( $b ) ) ) {
 			$skip = 'Programarea nu mai așteaptă plata';
+		} elseif ( 'pay_reminder' === $type && ( 'pending' !== $b['status'] || self::is_paid( $b ) || empty( $b['pay_by'] ) || SCP_Helpers::mysql_now() >= $b['pay_by'] ) ) {
+			$skip = 'Programarea nu mai așteaptă plata sau termenul a trecut';
 		} elseif ( in_array( $type, array( 'paid', 'remind_day', 'remind_hour' ), true ) && ! self::is_secured( $b ) ) {
 			$skip = 'Programarea nu e plătită și nici confirmată cu plata la studio';
 		} elseif ( in_array( $type, array( 'remind_day', 'remind_hour' ), true ) && ! self::still_useful( $b, $type ) ) {
@@ -610,6 +639,11 @@ class SCP_SMS {
 	private static function after_failure( array $b, array $row ): void {
 		if ( in_array( $row['type'], array( 'remind_day', 'remind_hour' ), true ) && empty( $row['backup_email_at'] ) && self::still_useful( $b, $row['type'] ) ) {
 			self::backup_email( $b, $row['type'], (int) $row['id'] );
+		}
+		// ultimul apel nu a ajuns: emailul de rezervă (doar cât programarea încă așteaptă plata)
+		if ( 'pay_reminder' === $row['type'] && empty( $row['backup_email_at'] ) && SCP_Mailer::on_last_call( $b ) ) {
+			global $wpdb;
+			$wpdb->update( self::table(), array( 'backup_email_at' => SCP_Helpers::mysql_now() ), array( 'id' => (int) $row['id'] ) );
 		}
 	}
 
@@ -804,7 +838,7 @@ class SCP_SMS {
 	}
 
 	public static function type_label( string $t ): string {
-		$l = array( 'created' => 'Rezervare', 'paid' => 'Confirmare', 'moved' => 'Mutare', 'remind_day' => 'Cu o zi înainte', 'remind_hour' => 'Cu o oră înainte' );
+		$l = array( 'created' => 'Rezervare', 'pay_reminder' => 'Ultimul apel la plată', 'paid' => 'Confirmare', 'moved' => 'Mutare', 'remind_day' => 'Cu o zi înainte', 'remind_hour' => 'Cu o oră înainte' );
 		if ( preg_match( '/^proba-\d+-(.+)$/', $t, $m ) ) {
 			return 'Probă: ' . ( self::SAMPLES[ $m[1] ] ?? $m[1] );
 		}
@@ -907,6 +941,7 @@ class SCP_SMS {
 	/** Mesajele automate, în ordinea în care le primește un client, cu eticheta lor. */
 	const SAMPLES = array(
 		'created'     => 'Rezervare cu link de plată',
+		'pay_reminder' => 'Ultimul apel la plată',
 		'paid'        => 'Plată primită',
 		'voucher'     => 'Rezervare cu voucher',
 		'studio'      => 'Plata la studio',

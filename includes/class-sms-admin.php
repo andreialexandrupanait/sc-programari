@@ -269,6 +269,7 @@ class SCP_SMS_Admin {
 					<?php
 					$labels = array(
 						'created'     => 'La rezervare (cu link de plată)',
+						'pay_reminder' => 'Ultimul apel la plată (cu puțin înainte de expirare; noaptea, la 21:30 sau la 08:00)',
 						'paid'        => 'La plată',
 						'voucher'     => 'La rezervarea cu voucher',
 						'studio'      => 'La rezervarea cu plata la studio',
