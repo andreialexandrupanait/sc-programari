@@ -16,17 +16,41 @@ class SCP_SMS_Admin {
 		return $out;
 	}
 
-	/** Numărătoarea de caractere de sub fiecare text SMS (cu datele de exemplu). */
+	/**
+	 * Numărătoarea de caractere și previzualizarea ca pe telefon, la fiecare text SMS, cu datele de exemplu.
+	 * Imită SCP_SMS::render(): fără diacritice, iar peste 160 de caractere renunță la prenume și apoi scurtează.
+	 */
 	public static function counter_script(): void {
 		?>
 		<script>
 		(function(){
 			var vars=<?php echo wp_json_encode( SCP_SMS::vars( SCP_SMS::sample_booking() ) ); ?>;
+			var map={'ă':'a','â':'a','î':'i','ș':'s','ş':'s','ț':'t','ţ':'t','Ă':'A','Â':'A','Î':'I','Ș':'S','Ş':'S','Ț':'T','Ţ':'T','–':'-','—':'-','„':'"','”':'"','“':'"','’':"'",'‘':"'",'…':'...','·':'-'};
+			function gsm(s){ return s.replace(/[ăâîșşțţĂÂÎȘŞȚŢ–—„”“’‘…·]/g,function(c){ return map[c]; }).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x0A\x20-\x7E]/g,''); }
 			function gsmlen(s){ return s.length + (s.match(/[\[\]{}\\^~|]/g)||[]).length; }
+			function fill(t,v){ Object.keys(v).forEach(function(k){ t=t.split(k).join(v[k]); }); return t; }
+			function render(tpl){
+				var txt=gsm(fill(tpl,vars)), dropped=false, cut=false;
+				if(gsmlen(txt)>160){
+					var v=Object.assign({},vars,{'{prenume}':''});
+					txt=gsm(fill(tpl,v)).replace(/^(Salut|Buna|Buna ziua),\s*!\s*/,'$1! ').replace(/^,\s*/,'');
+					dropped=true;
+				}
+				while(gsmlen(txt)>160){ txt=txt.slice(0,-1).replace(/\s+$/,''); cut=true; }
+				return {text:txt, raw:gsmlen(gsm(fill(tpl,vars))), dropped:dropped, cut:cut};
+			}
 			document.querySelectorAll('.scp-smsbox').forEach(function(box){
-				var ta=box.querySelector('textarea'), c=box.querySelector('.scp-smscount');
+				var ta=box.querySelector('textarea'), c=box.querySelector('.scp-smscount'), note=box.querySelector('.scp-smsnote'), bubble=box.querySelector('.scp-phone-bubble');
 				if(!ta||!c) return;
-				function upd(){ var t=ta.value; Object.keys(vars).forEach(function(k){ t=t.split(k).join(vars[k]); }); var n=gsmlen(t); c.textContent=n+' / 160'; c.classList.toggle('is-over',n>160); if(/[^\x20-\x7E\n]/.test(ta.value)) c.textContent+=' · are caractere speciale, se înlocuiesc la salvare'; }
+				function upd(){
+					var r=render(ta.value);
+					c.textContent=r.raw+' / 160'; c.classList.toggle('is-over',r.raw>160);
+					var msg=[];
+					if(/[^\x0A\x20-\x7E]/.test(ta.value)) msg.push('diacriticele și semnele speciale se înlocuiesc la trimitere');
+					if(r.cut) msg.push('prea lung: se taie la 160 de caractere'); else if(r.dropped) msg.push('prea lung cu prenumele: pleacă fără prenume');
+					if(note) note.textContent=msg.join(' · ');
+					if(bubble){ bubble.textContent=r.text||'(gol: la salvare revine textul implicit)'; bubble.classList.toggle('is-empty',!r.text); }
+				}
 				ta.addEventListener('input',upd); upd();
 			});
 		})();

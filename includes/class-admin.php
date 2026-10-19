@@ -1224,10 +1224,17 @@ class SCP_Admin {
 							?>
 					<details class="scp-mail scp-mail--sms">
 						<summary><?php echo self::channel( 'sms', true ); // phpcs:ignore ?><strong><?php echo esc_html( $sms_lbl[ $k ] ?? $k ); ?></strong> <?php echo empty( $tpl['enabled'] ) ? '<span class="scp-badge">oprit</span>' : ''; ?></summary>
-						<div class="scp-smsbox">
-							<label class="scp-inline-check"><input type="checkbox" name="sms_tpl[<?php echo esc_attr( $k ); ?>][enabled]" value="1" <?php checked( ! empty( $tpl['enabled'] ) ); ?>> Trimite acest SMS</label>
-							<label><span>Text SMS</span><textarea class="large-text scp-smstpl" rows="3" name="sms_tpl[<?php echo esc_attr( $k ); ?>][body]"><?php echo esc_textarea( (string) $tpl['body'] ); ?></textarea></label>
-							<p class="scp-smsprev"><span class="scp-smscount"></span> Exemplu: <code><?php echo esc_html( $preview ); ?></code></p>
+						<div class="scp-smsbox scp-smsbox--phone" data-sms="<?php echo esc_attr( $k ); ?>">
+							<div class="scp-smsedit">
+								<label class="scp-inline-check"><input type="checkbox" name="sms_tpl[<?php echo esc_attr( $k ); ?>][enabled]" value="1" <?php checked( ! empty( $tpl['enabled'] ) ); ?>> Trimite acest SMS</label>
+								<label><span>Text SMS</span><textarea class="large-text scp-smstpl" rows="4" name="sms_tpl[<?php echo esc_attr( $k ); ?>][body]"><?php echo esc_textarea( (string) $tpl['body'] ); ?></textarea></label>
+								<p class="scp-smsprev"><span class="scp-smscount"></span> <span class="scp-smsnote"></span></p>
+							</div>
+							<div class="scp-phone" aria-label="Previzualizare SMS">
+								<div class="scp-phone-head"><span class="scp-phone-avatar" aria-hidden="true"><span class="dashicons dashicons-smartphone"></span></span><span><b>SMS de la studio</b><small>Mesaj text · acum</small></span></div>
+								<div class="scp-phone-body"><div class="scp-phone-bubble"><?php echo esc_html( $preview ); ?></div></div>
+								<p class="scp-phone-foot">Exemplu cu Alexandra, 25.11, ora 17:00</p>
+							</div>
 						</div>
 					</details>
 							<?php

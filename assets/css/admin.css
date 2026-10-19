@@ -501,3 +501,22 @@
 .scp-settings .scp-mail textarea.large-text { min-height: 220px; }
 .scp-settings .scp-mail textarea.scp-smstpl { min-height: 84px; }
 .scp-settings h2 .scp-ch { margin-right: 8px; }
+
+/* Previzualizarea SMS ca pe telefon */
+.scp-smsbox--phone { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.scp-smsedit { min-width: 0; }
+.scp-phone { border: 1px solid #d9d4c8; border-radius: 22px; background: #f2f2f7; padding: 10px 10px 8px; box-shadow: 0 6px 18px rgba(30, 25, 15, .08); margin-top: 8px; }
+.scp-phone-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; border-bottom: 1px solid #e1e1e8; }
+.scp-phone-head b { display: block; font-size: 12.5px; color: #1d2327; }
+.scp-phone-head small { display: block; font-size: 11px; color: #8a8a8e; }
+.scp-phone-avatar { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #c7c7cc; color: #fff; }
+.scp-phone-avatar .dashicons { font-size: 16px; width: 16px; height: 16px; }
+.scp-phone-body { padding: 12px 4px 6px; min-height: 60px; }
+.scp-phone-bubble { display: inline-block; max-width: 100%; padding: 8px 12px; border-radius: 18px 18px 18px 4px; background: #e5e5ea; color: #1d2327; font: 13.5px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; white-space: pre-wrap; word-break: break-word; }
+.scp-phone-bubble.is-empty { color: #8a8a8e; font-style: italic; }
+.scp-phone-foot { margin: 4px 4px 0; font-size: 11px; color: #8a8a8e; }
+.scp-smsnote { color: #8a6a22; }
+@media (max-width: 900px) { .scp-smsbox--phone { grid-template-columns: 1fr; } .scp-phone { max-width: 340px; } }
+.scp-mail--sms .scp-smsedit > label { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #50575e; }
+.scp-mail--sms .scp-smsedit > label > span { display: block; margin-bottom: 4px; }
+.scp-mail--sms .scp-smsedit > .scp-inline-check { display: flex; gap: 6px; align-items: center; font-weight: 400; }
