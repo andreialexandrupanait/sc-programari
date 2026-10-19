@@ -536,7 +536,12 @@ a.scp-kpi:hover { border-color: var(--g); color: inherit; }
 .scp-cal-table thead th.scp-cal-xh { color: var(--g-deep, #1f3a17); }
 .scp-cal-table thead th.scp-cal-xh small { display: block; font-size: 10px; font-weight: 600; color: var(--gold, #b8933f); text-transform: uppercase; letter-spacing: .04em; }
 
-/* Conținutul pluginului, mai lat peste tot */
-.scp-admin { max-width: 1680px; }
-.scp-admin.scp-admin--wide { max-width: none; }
-.scp-settings { max-width: 1400px; }
+/* Aceeași lățime pe toate paginile modulului (Panou, programări, calendar, vouchere, setări, SMS) */
+.scp-admin, .scp-admin.scp-admin--wide, .scp-admin.scp-admin--full { max-width: 1440px; }
+.scp-admin .scp-settings { max-width: none; }
+
+/* Ora extra care lipsește dintr-o zi: căsuță punctată, din care o poți adăuga */
+.scp-cell--add { background: transparent; border: 1px dashed #d8d1c2; color: var(--muted); }
+.scp-cell--add .scp-cell-meta { opacity: .75; }
+.scp-cell--add:hover { border-color: var(--g); border-style: solid; background: #fff; }
+.scp-cell--add:hover .scp-cell-meta { opacity: 1; color: var(--g); }

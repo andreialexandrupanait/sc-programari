@@ -198,7 +198,17 @@
 			};
 			cols.forEach(function (t) {
 				var s = bySlot[t];
-				tr.appendChild(s ? el('td', {}, [cellBtn(s)]) : el('td', { class: 'scp-cell scp-cell--none' }));
+				if (s) { tr.appendChild(el('td', {}, [cellBtn(s)])); return; }
+				// Ora extra lipsește din această zi: căsuță goală, de pe care o poți adăuga și aici.
+				if (!std[t] && hasProgram && !day.day_blocked && day.date >= A.today) {
+					tr.appendChild(el('td', {}, [el('button', {
+						type: 'button', class: 'scp-cell scp-cell--add' + (self.sel && self.sel.date === day.date && self.sel.time === t ? ' is-selected' : ''), 'data-slot': day.date + ' ' + t,
+						'aria-label': day.label + ' ' + t + ': ora nu e în programul zilei',
+						onclick: function () { self.closePop(); self.selectAdd(day, t); }
+					}, [el('span', { class: 'scp-cell-meta', text: '+ adaugă' })])]));
+					return;
+				}
+				tr.appendChild(el('td', { class: 'scp-cell scp-cell--none' }));
 			});
 			tr.appendChild(el('td', { class: 'scp-cal-sum' }, [cap ? el('span', { text: booked + '/' + cap }) : el('span', { class: 'scp-muted', text: '–' })]));
 			tb.appendChild(tr);
@@ -258,6 +268,20 @@
 		this.markSelected();
 		this.showSide(day, s);
 		this.root.classList.add('has-side');
+	};
+
+	/** O oră extra care nu e în programul zilei: panoul oferă adăugarea ei doar în ziua aleasă. */
+	Calendar.prototype.selectAdd = function (day, t) {
+		var self = this;
+		this.sel = { date: day.date, time: t };
+		this.markSelected();
+		this.root.classList.add('has-side');
+		this.fillSide(ucfirst(day.label) + ', ora ' + t, [
+			el('p', { class: 'scp-side-state', text: 'Ora ' + t + ' nu e în programul acestei zile. În alte zile din lună a fost adăugată ca oră extra.' }),
+			el('button', { type: 'button', class: 'button button-primary scp-side-wide', text: 'Adaugă ora ' + t + ' în această zi', onclick: function () {
+				self.act('/slot', { date: day.date, time: t, action: 'add' }, 'Ora ' + t + ' a fost adăugată.');
+			} })
+		]);
 	};
 
 	Calendar.prototype.markSelected = function () {
