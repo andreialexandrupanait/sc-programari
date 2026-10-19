@@ -461,3 +461,43 @@
 .scp-badge--ps-free { background: #ece6f7; color: #4e3a8c; box-shadow: inset 0 0 0 1px #cfc2ec; }
 .scp-lg--gift::before { background: #ece6f7; border-color: #a893d6; }
 .scp-kpi-sub--free { color: #5d4799; }
+
+/* Canale: Email (albastru) și SMS (verde), cu iconiță */
+.scp-ch { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; padding: 2px 9px 2px 6px; border-radius: 999px; font-size: 11.5px; font-weight: 600; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
+.scp-ch .dashicons { width: 16px; height: 16px; font-size: 16px; }
+.scp-ch--mail { background: #e7effa; color: #1d5aa5; }
+.scp-ch--sms { background: #e4f3e7; color: #1f6b33; }
+.scp-ch--icon { padding: 3px; }
+.scp-ch-for { margin: 0 8px 0 0; font-size: 12px; font-weight: 400; color: var(--muted); }
+.scp-ch-divider { display: flex; align-items: center; gap: 14px; margin: 30px 0 4px; font-size: 14px; font-weight: 700; color: var(--ink, #23211d); }
+.scp-ch-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.scp-ch-divider > span { display: inline-flex; align-items: center; }
+.scp-ch-divider--sms { margin-top: 40px; padding-top: 22px; border-top: 3px double var(--line); }
+.scp-ch-note { margin: 0 0 10px !important; }
+.scp-mail summary .scp-ch { margin-right: 10px; }
+.scp-sms-sum { margin: 6px 0 14px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.scp-sms-sum li { display: flex; align-items: center; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.scp-sms-sum li .scp-badge { margin-left: auto; }
+.form-table th .scp-ch { margin-right: 6px; }
+
+/* Emailuri și SMS pe perioade */
+.scp-ch-legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 18px 0 6px; font-size: 12.5px; color: var(--muted); }
+.scp-ch-legend > span { display: inline-flex; align-items: center; }
+.scp-ch-backup { display: inline-block; white-space: nowrap; margin-right: 8px; padding: 1px 7px; border: 1px dashed #9db6d9; border-radius: 999px; font-size: 11px; font-weight: 600; color: #1d5aa5; background: #fff; }
+.scp-mail--sms { border-left: 3px solid #8cc79a; }
+.scp-mail--sms .scp-smsbox { max-width: none; margin: 0; }
+.scp-smsbox textarea { margin-top: 6px; font-family: Menlo, Consolas, monospace; }
+.scp-smsprev { margin: 4px 0 0; color: #646970; }
+.scp-smsprev code { white-space: normal; word-break: break-word; }
+.scp-smscount { font-weight: 700; margin-right: 8px; }
+.scp-smscount.is-over { color: #b32d2e; }
+.scp-mail--sms .scp-smsbox > label { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #50575e; }
+.scp-mail--sms .scp-smsbox > label > span { display: block; margin-bottom: 4px; }
+.scp-mail--sms .scp-smsbox > .scp-inline-check { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+
+/* Subiectul și textele emailurilor / SMS-urilor ocupă toată lățimea casetei */
+.scp-settings .scp-mail input.large-text,
+.scp-settings .scp-mail textarea.large-text { display: block; width: 100%; max-width: none; box-sizing: border-box; }
+.scp-settings .scp-mail textarea.large-text { min-height: 220px; }
+.scp-settings .scp-mail textarea.scp-smstpl { min-height: 84px; }
+.scp-settings h2 .scp-ch { margin-right: 8px; }

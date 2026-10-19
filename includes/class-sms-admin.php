@@ -6,6 +6,49 @@ defined( 'ABSPATH' ) || exit;
  */
 class SCP_SMS_Admin {
 
+	/** Textele SMS trimise din Setări: fără diacritice, iar un text gol revine la cel implicit. */
+	public static function clean_templates( array $in ): array {
+		$out = array();
+		foreach ( SCP_SMS::defaults()['templates'] as $k => $def ) {
+			$body      = SCP_SMS::gsm( sanitize_textarea_field( (string) ( $in[ $k ]['body'] ?? $def['body'] ) ) );
+			$out[ $k ] = array( 'enabled' => empty( $in[ $k ]['enabled'] ) ? 0 : 1, 'body' => '' !== trim( $body ) ? $body : $def['body'] );
+		}
+		return $out;
+	}
+
+	/** Numărătoarea de caractere de sub fiecare text SMS (cu datele de exemplu). */
+	public static function counter_script(): void {
+		?>
+		<script>
+		(function(){
+			var vars=<?php echo wp_json_encode( SCP_SMS::vars( SCP_SMS::sample_booking() ) ); ?>;
+			function gsmlen(s){ return s.length + (s.match(/[\[\]{}\\^~|]/g)||[]).length; }
+			document.querySelectorAll('.scp-smsbox').forEach(function(box){
+				var ta=box.querySelector('textarea'), c=box.querySelector('.scp-smscount');
+				if(!ta||!c) return;
+				function upd(){ var t=ta.value; Object.keys(vars).forEach(function(k){ t=t.split(k).join(vars[k]); }); var n=gsmlen(t); c.textContent=n+' / 160'; c.classList.toggle('is-over',n>160); if(/[^\x20-\x7E\n]/.test(ta.value)) c.textContent+=' · are caractere speciale, se înlocuiesc la salvare'; }
+				ta.addEventListener('input',upd); upd();
+			});
+		})();
+		</script>
+		<?php
+	}
+
+	/** Mesajele SMS, în ordinea în care le primește un client (pagina SMS și rezumatul din Setări). */
+	public static function labels(): array {
+		return array(
+			'created'      => 'La rezervare (cu link de plată)',
+			'pay_reminder' => 'Ultimul apel la plată (cu puțin înainte de expirare; noaptea, la 21:30 sau la 08:00)',
+			'paid'         => 'La plată',
+			'voucher'      => 'La rezervarea cu voucher',
+			'studio'       => 'La rezervarea cu plata la studio',
+			'free'         => 'La ședința oferită gratuit',
+			'moved'        => 'La mutarea ședinței (din admin, cu „Anunță clientul”)',
+			'remind_day'   => 'Cu o zi înainte',
+			'remind_hour'  => 'Cu o oră înainte',
+		);
+	}
+
 	const SLUG     = 'scp-sms';
 	const NETWORKS = array( 'orange' => 'Orange', 'vodafone' => 'Vodafone', 'telekom' => 'Telekom', 'digi' => 'Digi' );
 
@@ -36,23 +79,18 @@ class SCP_SMS_Admin {
 
 	public static function handle_save(): void {
 		self::guard( 'scp_sms_save' );
-		$p    = wp_unslash( $_POST ); // phpcs:ignore
+		$p = wp_unslash( $_POST ); // phpcs:ignore
+		SCP_SMS::save( array( 'sender' => sanitize_text_field( $p['sender'] ?? '' ) ) );
+		self::back( 'Expeditorul a fost salvat.', '#setari' );
+	}
+
+	/** Setările SMS trimise din Setări → SMS (fără expeditor, care ține de integrare). */
+	public static function clean_settings( array $p ): array {
 		$time = static fn( $v, $d ) => preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', (string) $v ) ? (string) $v : $d;
-		$tpls = array();
-		$long = array();
-		foreach ( SCP_SMS::defaults()['templates'] as $k => $def ) {
-			$body        = SCP_SMS::gsm( sanitize_textarea_field( $p['tpl'][ $k ]['body'] ?? $def['body'] ) );
-			$tpls[ $k ]  = array( 'enabled' => empty( $p['tpl'][ $k ]['enabled'] ) ? 0 : 1, 'body' => $body ?: $def['body'] );
-			$len         = SCP_SMS::length( strtr( $tpls[ $k ]['body'], SCP_SMS::vars( array_merge( SCP_SMS::sample_booking(), 'voucher' === $k ? array( 'payment_status' => 'voucher' ) : array() ) ) ) );
-			if ( $len > 160 ) {
-				$long[] = $k . ' (' . $len . ')';
-			}
-		}
-		$values = array(
+		return array(
 			'enabled'          => in_array( $p['mode'] ?? '', array( 'test', 'on' ), true ) ? 1 : 0,
 			'test_mode'        => 'test' === ( $p['mode'] ?? '' ) ? 1 : 0,
 			'test_numbers'     => implode( ', ', array_filter( array_map( static fn( $n ) => SCP_Helpers::normalize_phone( trim( $n ) ), preg_split( '/[,;\n]+/', (string) ( $p['test_numbers'] ?? '' ) ) ) ) ),
-			'sender'           => sanitize_text_field( $p['sender'] ?? '' ),
 			'address'          => SCP_SMS::gsm( sanitize_text_field( $p['address'] ?? '' ) ),
 			'remind_day_time'  => $time( $p['remind_day_time'] ?? '', '18:00' ),
 			'remind_hour_mins' => max( 15, min( 240, (int) ( $p['remind_hour_mins'] ?? 60 ) ) ),
@@ -60,15 +98,47 @@ class SCP_SMS_Admin {
 			'report_time'      => $time( $p['report_time'] ?? '', '18:00' ),
 			'backup_email'     => 'always' === ( $p['backup_email'] ?? '' ) ? 'always' : 'fallback',
 			'alert_emails'     => implode( ', ', array_filter( array_map( 'sanitize_email', preg_split( '/[\s,;]+/', (string) ( $p['alert_emails'] ?? '' ) ) ), 'is_email' ) ),
-			'templates'        => $tpls,
 		);
-		$old = SCP_SMS::settings();
+	}
+
+	/** Salvează setările și textele SMS venite din Setări; raportul zilnic se reprogramează dacă i s-a schimbat ora. */
+	public static function save_from_settings( array $settings, array $templates ): void {
+		$old    = SCP_SMS::settings();
+		$values = self::clean_settings( $settings );
+		$values['templates'] = self::clean_templates( $templates );
 		SCP_SMS::save( $values );
 		if ( SCP_SMS::has_scheduler() && ( $old['report_time'] !== $values['report_time'] || (int) $old['report_enabled'] !== $values['report_enabled'] ) ) {
 			as_unschedule_all_actions( 'scp_sms_report', array(), SCP_SMS::GROUP );
 			SCP_SMS::schedule_report();
 		}
-		self::back( $long ? 'Setările au fost salvate. Atenție, depășesc 160 de caractere cu datele de exemplu: ' . implode( ', ', $long ) . '. La trimitere se renunță întâi la prenume, apoi textul se scurtează.' : 'Setările au fost salvate.', '#setari' );
+	}
+
+	/** Rândurile cu setările SMS pentru pagina Setări (câmpurile au prefixul sms[...]). */
+	public static function settings_rows(): void {
+		$s    = SCP_SMS::settings();
+		$mode = ! $s['enabled'] ? 'off' : ( $s['test_mode'] ? 'test' : 'on' );
+		$test = admin_url( 'admin.php?page=' . self::SLUG );
+		?>
+		<table class="form-table" role="presentation">
+			<tr><th>Trimitere automată</th><td>
+				<label><input type="radio" name="sms[mode]" value="off" <?php checked( $mode, 'off' ); ?>> Oprită</label><br>
+				<label><input type="radio" name="sms[mode]" value="test" <?php checked( $mode, 'test' ); ?>> <strong>Mod test:</strong> doar către numerele de mai jos (clienții nu primesc nimic)</label><br>
+				<label><input type="radio" name="sms[mode]" value="on" <?php checked( $mode, 'on' ); ?>> Către toți clienții</label>
+				<p class="description">Pași: întâi testul de livrare pe rețele (pe <a href="<?php echo esc_url( $test . '#test' ); ?>">pagina SMS</a>), apoi „Mod test” și o programare de probă pe numărul tău, apoi „Către toți clienții”.</p>
+			</td></tr>
+			<tr><th><label for="sms-test-numbers">Numere de test</label></th><td><input type="text" class="large-text" name="sms[test_numbers]" id="sms-test-numbers" value="<?php echo esc_attr( (string) $s['test_numbers'] ); ?>" placeholder="ex. 0755 215 135, 0749 270 232"><p class="description">Separate prin virgulă. În „Mod test”, doar programările cu aceste numere primesc SMS.</p></td></tr>
+			<tr><th><label for="sms-address">Adresa în SMS</label></th><td><input type="text" class="regular-text" name="sms[address]" id="sms-address" value="<?php echo esc_attr( $s['address'] ); ?>"><p class="description">Variantă scurtă, fără diacritice (variabila {adresa}).</p></td></tr>
+			<tr><th><label for="sms-remind-day">Reamintirea de cu o zi înainte</label></th><td>la ora <input type="time" name="sms[remind_day_time]" id="sms-remind-day" value="<?php echo esc_attr( $s['remind_day_time'] ); ?>"> în ziua dinaintea ședinței</td></tr>
+			<tr><th><label for="sms-remind-hour">Reamintirea scurtă</label></th><td><input type="number" min="15" max="240" class="small-text" name="sms[remind_hour_mins]" id="sms-remind-hour" value="<?php echo esc_attr( (string) $s['remind_hour_mins'] ); ?>"> minute înainte de ședință</td></tr>
+			<tr><th><?php echo SCP_Admin::channel( 'email', true ); // phpcs:ignore ?>Email de rezervă</th><td>
+				<label><input type="radio" name="sms[backup_email]" value="fallback" <?php checked( $s['backup_email'], 'fallback' ); ?>> Doar dacă SMS-ul de reamintire nu ajunge</label><br>
+				<label><input type="radio" name="sms[backup_email]" value="always" <?php checked( $s['backup_email'], 'always' ); ?>> La fiecare reamintire, odată cu SMS-ul</label>
+			</td></tr>
+			<tr><th>Raport zilnic</th><td><label><input type="checkbox" name="sms[report_enabled]" value="1" <?php checked( $s['report_enabled'] ); ?>> Trimite la ora</label> <input type="time" name="sms[report_time]" value="<?php echo esc_attr( $s['report_time'] ); ?>"> lista ședințelor de mâine și starea SMS-urilor</td></tr>
+			<tr><th><label for="sms-alerts">Rapoarte și alerte către</label></th><td><input type="text" class="large-text" name="sms[alert_emails]" id="sms-alerts" value="<?php echo esc_attr( $s['alert_emails'] ); ?>" placeholder="<?php echo esc_attr( (string) SCP_Settings::get( 'admin_emails' ) ); ?>"><p class="description">Gol = adresele de la notificări. Alertele pleacă la cheie invalidă, credit terminat și la cel puțin trei eșecuri într-o oră.</p></td></tr>
+		</table>
+		<input type="hidden" name="sms_form" value="1">
+		<?php
 	}
 
 	public static function handle_test(): void {
@@ -188,7 +258,7 @@ class SCP_SMS_Admin {
 
 			<section class="scp-panel" id="probe">
 				<h2>Toate mesajele, acum, pe numărul tău</h2>
-				<p class="description">Trimite imediat câte un exemplu din fiecare mesaj automat (<?php echo esc_html( implode( ', ', SCP_SMS::SAMPLES ) ); ?>), cu textele din setările de mai jos și o programare de exemplu (Alexandra, 25.11, ora 17:00). Nu ține cont de „Trimitere automată”, nu atinge programările și consumă câte un SMS pentru fiecare mesaj (<?php echo (int) count( SCP_SMS::SAMPLES ); ?> în total). Linkul de plată din primul mesaj e de exemplu și nu duce la o programare.</p>
+				<p class="description">Trimite imediat câte un exemplu din fiecare mesaj automat (<?php echo esc_html( implode( ', ', SCP_SMS::SAMPLES ) ); ?>), cu textele din Setări → Emailuri și SMS și o programare de exemplu (Alexandra, 25.11, ora 17:00). Nu ține cont de „Trimitere automată”, nu atinge programările și consumă câte un SMS pentru fiecare mesaj (<?php echo (int) count( SCP_SMS::SAMPLES ); ?> în total). Linkul de plată din primul mesaj e de exemplu și nu duce la o programare.</p>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-inline-form" onsubmit="return confirm('Trimit <?php echo (int) count( SCP_SMS::SAMPLES ); ?> SMS-uri de probă pe acest număr?');">
 					<?php wp_nonce_field( 'scp_sms_samples' ); ?><input type="hidden" name="action" value="scp_sms_samples">
 					<?php $first = SCP_SMS::test_numbers()[0] ?? ''; ?>
@@ -231,19 +301,14 @@ class SCP_SMS_Admin {
 			</section>
 
 			<section class="scp-panel" id="setari">
-				<h2>Setări și mesaje</h2>
+				<h2>Integrare SMSO</h2>
+				<p class="description">Trimiterea automată, numerele de test, reamintirile și textele SMS sunt în <a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-settings#sms' ) ); ?>">Setări → SMS</a> și <a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-settings#emailuri' ) ); ?>">Setări → Emailuri și SMS</a>. Aici rămân doar legătura cu SMSO, testele și jurnalul.</p>
+				<?php if ( defined( 'SCP_SMSO_SENDER' ) ) : ?>
+					<p>Expeditorul e setat în wp-config.php: <b><?php echo esc_html( (string) SCP_SMSO_SENDER ); ?></b>.</p>
+				<?php else : ?>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'scp_sms_save' ); ?><input type="hidden" name="action" value="scp_sms_save">
 					<table class="form-table" role="presentation">
-						<?php $mode = ! $s['enabled'] ? 'off' : ( $s['test_mode'] ? 'test' : 'on' ); ?>
-						<tr><th>Trimitere automată</th><td>
-							<label><input type="radio" name="mode" value="off" <?php checked( $mode, 'off' ); ?>> Oprită</label><br>
-							<label><input type="radio" name="mode" value="test" <?php checked( $mode, 'test' ); ?>> <strong>Mod test:</strong> doar către numerele de mai jos (clienții nu primesc nimic)</label><br>
-							<label><input type="radio" name="mode" value="on" <?php checked( $mode, 'on' ); ?>> Către toți clienții</label>
-							<p class="description">Pași: întâi testul de livrare pe rețele (mai sus), apoi „Mod test” și o programare de probă pe numărul tău (rezervare, plată, mutare, reamintiri), apoi „Către toți clienții”.</p>
-						</td></tr>
-						<tr><th><label for="test_numbers">Numere de test</label></th><td><input type="text" class="large-text" name="test_numbers" id="test_numbers" value="<?php echo esc_attr( (string) $s['test_numbers'] ); ?>" placeholder="ex. 0755 215 135, 0749 270 232"><p class="description">Separate prin virgulă. În „Mod test”, doar programările cu aceste numere primesc SMS; restul apar în jurnal ca „Nu a mai fost nevoie: mod test”.</p></td></tr>
-						<?php if ( ! defined( 'SCP_SMSO_SENDER' ) ) : ?>
 						<tr><th><label for="sender">Expeditor</label></th><td>
 							<?php if ( $senders ) : ?>
 								<select name="sender" id="sender"><option value="">— alege —</option><?php foreach ( $senders as $sd ) : ?><option value="<?php echo esc_attr( $sd['id'] ); ?>" <?php selected( $s['sender'], $sd['id'] ); ?>><?php echo esc_html( $sd['name'] . ( null !== $sd['price'] ? ' · ' . $sd['price'] . ' / mesaj' : '' ) ); ?></option><?php endforeach; ?></select>
@@ -251,45 +316,10 @@ class SCP_SMS_Admin {
 								<input type="text" class="regular-text" name="sender" id="sender" value="<?php echo esc_attr( $s['sender'] ); ?>"><p class="description">Lista expeditorilor apare aici după ce cheia SMSO e în wp-config.php.</p>
 							<?php endif; ?>
 						</td></tr>
-						<?php endif; ?>
-						<tr><th><label for="address">Adresa în SMS</label></th><td><input type="text" class="regular-text" name="address" id="address" value="<?php echo esc_attr( $s['address'] ); ?>"><p class="description">Variantă scurtă, fără diacritice.</p></td></tr>
-						<tr><th><label for="remind_day_time">Reamintirea de cu o zi înainte</label></th><td>la ora <input type="time" name="remind_day_time" id="remind_day_time" value="<?php echo esc_attr( $s['remind_day_time'] ); ?>"> în ziua dinaintea ședinței</td></tr>
-						<tr><th><label for="remind_hour_mins">Reamintirea scurtă</label></th><td><input type="number" min="15" max="240" class="small-text" name="remind_hour_mins" id="remind_hour_mins" value="<?php echo esc_attr( (string) $s['remind_hour_mins'] ); ?>"> minute înainte de ședință</td></tr>
-						<tr><th>Email de rezervă</th><td>
-							<label><input type="radio" name="backup_email" value="fallback" <?php checked( $s['backup_email'], 'fallback' ); ?>> Doar dacă SMS-ul de reamintire nu ajunge</label><br>
-							<label><input type="radio" name="backup_email" value="always" <?php checked( $s['backup_email'], 'always' ); ?>> La fiecare reamintire, odată cu SMS-ul</label>
-							<p class="description">Textele emailurilor sunt în Setări → Emailuri: „Reamintire ședință cu o zi / o oră înainte”.</p>
-						</td></tr>
-						<tr><th>Raport zilnic</th><td><label><input type="checkbox" name="report_enabled" value="1" <?php checked( $s['report_enabled'] ); ?>> Trimite la ora</label> <input type="time" name="report_time" value="<?php echo esc_attr( $s['report_time'] ); ?>"> lista ședințelor de mâine și starea SMS-urilor</td></tr>
-						<tr><th><label for="alert_emails">Rapoarte și alerte către</label></th><td><input type="text" class="large-text" name="alert_emails" id="alert_emails" value="<?php echo esc_attr( $s['alert_emails'] ); ?>" placeholder="<?php echo esc_attr( (string) SCP_Settings::get( 'admin_emails' ) ); ?>"><p class="description">Gol = adresele de la notificări. Alertele pleacă la cheie invalidă (401), credit terminat (402) și la cel puțin trei eșecuri într-o oră; același tip de alertă cel mult o dată pe oră.</p></td></tr>
 					</table>
-
-					<h3>Mesaje</h3>
-					<p class="description">Fără diacritice, maximum 160 de caractere. Variabile: <code>{prenume}</code> <code>{ziua}</code> <code>{data}</code> <code>{ora}</code> <code>{termen}</code> <code>{link}</code> <code>{adresa}</code> <code>{telefon_studio}</code> <code>{cod}</code>. Numărătoarea folosește un exemplu cu valori lungi.</p>
-					<?php
-					$labels = array(
-						'created'     => 'La rezervare (cu link de plată)',
-						'pay_reminder' => 'Ultimul apel la plată (cu puțin înainte de expirare; noaptea, la 21:30 sau la 08:00)',
-						'paid'        => 'La plată',
-						'voucher'     => 'La rezervarea cu voucher',
-						'studio'      => 'La rezervarea cu plata la studio',
-						'free'        => 'La ședința oferită gratuit',
-						'moved'       => 'La mutarea ședinței (din admin, cu „Anunță clientul”)',
-						'remind_day'  => 'Cu o zi înainte',
-						'remind_hour' => 'Cu o oră înainte',
-					);
-					foreach ( $labels as $k => $label ) :
-						$tpl     = $s['templates'][ $k ];
-						$preview = SCP_SMS::render( $tpl['body'], array_merge( $sample, 'voucher' === $k ? array( 'payment_status' => 'voucher' ) : array() ) );
-						?>
-						<div class="scp-smsbox">
-							<label><input type="checkbox" name="tpl[<?php echo esc_attr( $k ); ?>][enabled]" value="1" <?php checked( $tpl['enabled'] ); ?>> <b><?php echo esc_html( $label ); ?></b></label>
-							<textarea class="large-text scp-smstpl" rows="3" name="tpl[<?php echo esc_attr( $k ); ?>][body]"><?php echo esc_textarea( $tpl['body'] ); ?></textarea>
-							<p class="scp-smsprev"><span class="scp-smscount"></span> Exemplu: <code><?php echo esc_html( $preview ); ?></code></p>
-						</div>
-					<?php endforeach; ?>
-					<p><button class="button button-primary">Salvează</button></p>
+					<p><button class="button button-primary">Salvează expeditorul</button></p>
 				</form>
+				<?php endif; ?>
 			</section>
 
 			<section class="scp-panel" id="jurnal">

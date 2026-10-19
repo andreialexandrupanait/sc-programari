@@ -311,6 +311,13 @@ class SCP_Admin {
 		self::footer();
 	}
 
+	/** Eticheta canalului (Email / SMS), cu iconiță; $compact = doar iconița, cu textul pentru cititoarele de ecran. */
+	public static function channel( string $type, bool $compact = false ): string {
+		$sms  = 'sms' === $type;
+		$text = $sms ? 'SMS' : 'Email';
+		return '<span class="scp-ch scp-ch--' . ( $sms ? 'sms' : 'mail' ) . ( $compact ? ' scp-ch--icon' : '' ) . '" title="' . $text . '"><span class="dashicons dashicons-' . ( $sms ? 'smartphone' : 'email-alt' ) . '" aria-hidden="true"></span>' . ( $compact ? '<span class="screen-reader-text">' . $text . '</span>' : $text ) . '</span>';
+	}
+
 	/** Eticheta de plată pe înțelesul tuturor (vezi SCP_Bookings::pay_state). */
 	private static function pay_badge( array $b ): string {
 		$st = SCP_Bookings::pay_state( $b );
@@ -1065,7 +1072,7 @@ class SCP_Admin {
 			<input type="hidden" name="action" value="scp_save_settings">
 
 			<nav class="scp-tabs" aria-label="Secțiuni setări">
-				<a href="#program">Program</a><a href="#pachete">Pachete</a><a href="#studio">Studio</a><a href="#emailuri">Emailuri</a><a href="#plata">Plată și vouchere</a><a href="#webhook">Webhook n8n</a>
+				<a href="#program">Program</a><a href="#pachete">Pachete</a><a href="#studio">Studio</a><a href="#sms">SMS</a><a href="#emailuri">Emailuri și SMS</a><a href="#plata">Plată și vouchere</a><a href="#webhook">Webhook n8n</a>
 			</nav>
 
 			<section class="scp-panel" id="program">
@@ -1131,8 +1138,14 @@ class SCP_Admin {
 				</table>
 			</section>
 
+			<section class="scp-panel" id="sms">
+				<h2><?php echo self::channel( 'sms', true ); // phpcs:ignore ?>SMS: trimitere și reamintiri</h2>
+				<?php SCP_SMS_Admin::settings_rows(); ?>
+				<p class="description">Textele SMS sunt mai jos, la „Emailuri și SMS”. Legătura cu SMSO (expeditorul), testele și jurnalul sunt pe <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . SCP_SMS_Admin::SLUG ) ); ?>">pagina SMS</a>.</p>
+			</section>
+
 			<section class="scp-panel" id="emailuri">
-				<h2>Emailuri</h2>
+				<h2>Emailuri și SMS</h2>
 				<p class="description">Emailurile pleacă prin funcția de email a site-ului, deci prin Postmark, așa cum e configurat în FluentSMTP. Lasă expeditorul gol ca să folosești setarea din FluentSMTP.</p>
 				<table class="form-table" role="presentation">
 					<tr><th><label for="admin_emails">Notificări programări noi</label></th><td><input type="text" class="large-text" name="admin_emails" id="admin_emails" value="<?php echo esc_attr( $s['admin_emails'] ); ?>"><p class="description">Una sau mai multe adrese, separate prin virgulă.</p></td></tr>
@@ -1142,32 +1155,98 @@ class SCP_Admin {
 				</table>
 				<p class="scp-placeholders">În subiect și text poți folosi: <code>{nume}</code> <code>{data}</code> <code>{ziua}</code> <code>{data_lunga}</code> <code>{ora}</code> <code>{pachet}</code> <code>{pret}</code> <code>{cod}</code> <code>{telefon}</code> <code>{email}</code> <code>{mesaj}</code> <code>{studio}</code> <code>{adresa}</code> <code>{telefon_studio}</code> <code>{link_plata}</code> <code>{termen_plata}</code> <code>{pret_intreg}</code> <code>{reducere}</code>. Detaliile ședinței (dată, oră, pachet, adresă, cod) apar automat sub text.</p>
 				<?php
-				$titles = array(
-					'client_pending'      => 'Rezervare de pe site, cu link de plată',
-					'payment_received'    => 'Plată primită, programare confirmată',
-					'payment_reminder'    => 'Reamintire plată',
-					'payment_last_call'   => 'Ultimul apel la plată (rezervă pentru SMS)',
-					'session_reminder_day'  => 'Reamintire ședință cu o zi înainte (rezervă pentru SMS)',
-					'session_reminder_hour' => 'Reamintire ședință cu o oră înainte (rezervă pentru SMS)',
-					'expired'             => 'Rezervare anulată automat (neplătită)',
-					'client_confirmation' => 'Confirmare fără plată online (programări din admin)',
-					'client_studio'       => 'Confirmare cu plata la studio, cash sau card',
-					'admin_new'           => 'Alertă programare nouă (către voi)',
-					'voucher_issued'      => 'Voucher cumpărat: codurile către cumpărător',
-					'payment_link'        => 'Link de plată trimis manual',
-					'rescheduled'         => 'Programare mutată',
-					'cancelled'           => 'Programare anulată',
+				$sms_on   = (bool) SCP_SMS::get( 'enabled' );
+				$sms_test = $sms_on && SCP_SMS::get( 'test_mode' );
+				$sms_tpls = (array) SCP_SMS::get( 'templates' );
+				$sms_lbl  = SCP_SMS_Admin::labels();
+				$sample   = SCP_SMS::sample_booking();
+				// Mesajele pe perioade, în ordinea în care le primește un client.
+				// e = email, s = SMS, b = email de rezervă (pleacă doar dacă SMS-ul nu poate pleca sau nu ajunge).
+				$stages = array(
+					'La rezervare'       => array(
+						array( 'e', 'client_pending', 'Rezervare de pe site, cu link de plată' ),
+						array( 's', 'created' ),
+						array( 'e', 'client_confirmation', 'Confirmare fără plată online (programări din admin)' ),
+						array( 'e', 'client_studio', 'Confirmare cu plata la studio, cash sau card' ),
+						array( 's', 'studio' ),
+						array( 's', 'voucher' ),
+						array( 's', 'free' ),
+					),
+					'Până la plată'      => array(
+						array( 'e', 'payment_reminder', 'Reamintire plată (la orele din „Plată” → Reamintiri pe email)' ),
+						array( 's', 'pay_reminder' ),
+						array( 'b', 'payment_last_call', 'Ultimul apel la plată' ),
+						array( 'e', 'payment_link', 'Link de plată trimis manual (din fișa programării)' ),
+						array( 'e', 'expired', 'Rezervare anulată automat (neplătită)' ),
+					),
+					'La plată'           => array(
+						array( 'e', 'payment_received', 'Plată primită, programare confirmată' ),
+						array( 's', 'paid' ),
+					),
+					'Mutare sau anulare' => array(
+						array( 'e', 'rescheduled', 'Programare mutată' ),
+						array( 's', 'moved' ),
+						array( 'e', 'cancelled', 'Programare anulată' ),
+					),
+					'Înainte de ședință' => array(
+						array( 's', 'remind_day' ),
+						array( 'b', 'session_reminder_day', 'Reamintire ședință cu o zi înainte' ),
+						array( 's', 'remind_hour' ),
+						array( 'b', 'session_reminder_hour', 'Reamintire ședință cu o oră înainte' ),
+					),
+					'Vouchere cadou'     => array(
+						array( 'e', 'voucher_issued', 'Voucher cumpărat: codurile către cumpărător' ),
+					),
+					'Către voi'          => array(
+						array( 'e', 'admin_new', 'Alertă programare nouă (la adresele de la „Notificări programări noi”)' ),
+					),
 				);
-				foreach ( $titles as $key => $title ) :
-					$e = $s['emails'][ $key ];
-					?>
+				?>
+				<div class="scp-ch-legend">
+					<span><?php echo self::channel( 'email' ); // phpcs:ignore ?>pleacă pe email</span>
+					<span><?php echo self::channel( 'sms' ); // phpcs:ignore ?>pleacă pe SMS</span>
+					<span><?php echo self::channel( 'email' ); // phpcs:ignore ?><span class="scp-ch-backup">rezervă</span>email doar dacă SMS-ul nu ajunge</span>
+				</div>
+				<p class="description scp-ch-note">
+					<?php echo esc_html( $sms_on ? ( $sms_test ? 'SMS-urile sunt în Mod test: pleacă doar către numerele de test.' : 'SMS-urile automate sunt pornite.' ) : 'SMS-urile automate sunt oprite.' ); ?>
+					Pornirea și reamintirile sunt mai sus, la <a href="#sms">SMS</a>.
+					SMS-urile se scriu fără diacritice, sub 160 de caractere, cu variabilele <code>{prenume}</code> <code>{ziua}</code> <code>{data}</code> <code>{ora}</code> <code>{termen}</code> <code>{link}</code> <code>{adresa}</code> <code>{telefon_studio}</code> <code>{cod}</code>.
+				</p>
+				<input type="hidden" name="sms_tpl_form" value="1">
+				<?php foreach ( $stages as $stage => $items ) : ?>
+					<div class="scp-ch-divider"><span><?php echo esc_html( $stage ); ?></span></div>
+					<?php
+					foreach ( $items as $it ) :
+						if ( 's' === $it[0] ) :
+							$k       = $it[1];
+							$tpl     = $sms_tpls[ $k ] ?? array( 'enabled' => 0, 'body' => '' );
+							$preview = SCP_SMS::render( (string) $tpl['body'], array_merge( $sample, in_array( $k, array( 'voucher', 'free' ), true ) ? array( 'payment_status' => $k ) : array() ) );
+							?>
+					<details class="scp-mail scp-mail--sms">
+						<summary><?php echo self::channel( 'sms', true ); // phpcs:ignore ?><strong><?php echo esc_html( $sms_lbl[ $k ] ?? $k ); ?></strong> <?php echo empty( $tpl['enabled'] ) ? '<span class="scp-badge">oprit</span>' : ''; ?></summary>
+						<div class="scp-smsbox">
+							<label class="scp-inline-check"><input type="checkbox" name="sms_tpl[<?php echo esc_attr( $k ); ?>][enabled]" value="1" <?php checked( ! empty( $tpl['enabled'] ) ); ?>> Trimite acest SMS</label>
+							<label><span>Text SMS</span><textarea class="large-text scp-smstpl" rows="3" name="sms_tpl[<?php echo esc_attr( $k ); ?>][body]"><?php echo esc_textarea( (string) $tpl['body'] ); ?></textarea></label>
+							<p class="scp-smsprev"><span class="scp-smscount"></span> Exemplu: <code><?php echo esc_html( $preview ); ?></code></p>
+						</div>
+					</details>
+							<?php
+						else :
+							$key = $it[1];
+							$e   = $s['emails'][ $key ];
+							?>
 					<details class="scp-mail" <?php echo 'client_pending' === $key ? 'open' : ''; ?>>
-						<summary><strong><?php echo esc_html( $title ); ?></strong> <?php echo empty( $e['enabled'] ) ? '<span class="scp-badge">oprit</span>' : ''; ?></summary>
+						<summary><?php echo self::channel( 'email', true ); // phpcs:ignore ?><?php echo 'b' === $it[0] ? '<span class="scp-ch-backup" title="Pleacă doar dacă SMS-ul nu poate pleca sau nu ajunge">rezervă SMS</span>' : ''; ?><strong><?php echo esc_html( $it[2] ); ?></strong> <?php echo empty( $e['enabled'] ) ? '<span class="scp-badge">oprit</span>' : ''; ?></summary>
 						<label class="scp-inline-check"><input type="checkbox" name="emails[<?php echo esc_attr( $key ); ?>][enabled]" value="1" <?php checked( ! empty( $e['enabled'] ) ); ?>> Trimite acest email<?php echo 'payment_link' === $key ? ' (se trimite doar când apeși butonul din fișa programării)' : ''; ?></label>
 						<label><span>Subiect</span><input type="text" class="large-text" name="emails[<?php echo esc_attr( $key ); ?>][subject]" value="<?php echo esc_attr( $e['subject'] ); ?>"></label>
 						<label><span>Text</span><textarea class="large-text" rows="9" name="emails[<?php echo esc_attr( $key ); ?>][body]"><?php echo esc_textarea( $e['body'] ); ?></textarea></label>
 					</details>
+							<?php
+						endif;
+					endforeach;
+					?>
 				<?php endforeach; ?>
+				<?php SCP_SMS_Admin::counter_script(); ?>
 			</section>
 
 			<section class="scp-panel" id="plata">
@@ -1201,8 +1280,8 @@ class SCP_Admin {
 						<input type="number" min="0" max="336" name="pay_hours" id="pay_hours" value="<?php echo esc_attr( (string) $s['pay_hours'] ); ?>" class="small-text"> ore de la rezervare
 						<p class="description">Rezervările de pe site au statusul „Așteaptă plata” și se anulează automat dacă plata nu ajunge în acest termen. 0 = fără termen (rezervările sunt confirmate direct). Dacă ședința are loc înainte de expirarea termenului, rezervarea nu se mai anulează automat: clientul primește linkul de plată și poate plăti online sau la studio.</p>
 					</td></tr>
-					<tr><th><label for="pay_reminders">Reamintiri pe email</label></th><td><input type="text" name="pay_reminders" id="pay_reminders" value="<?php echo esc_attr( (string) $s['pay_reminders'] ); ?>" class="regular-text" placeholder="24, 12, 3"> ore înainte de expirare <p class="description">Câte un email la fiecare interval, de exemplu „24, 12, 3”. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. Gol = fără reamintiri.</p></td></tr>
-					<tr><th><label for="last_call_minutes">Ultimul apel</label></th><td><input type="number" min="0" max="180" name="last_call_minutes" id="last_call_minutes" value="<?php echo esc_attr( (string) $s['last_call_minutes'] ); ?>" class="small-text"> minute înainte de expirare <p class="description">SMS: „plătește până la …, ca ora să nu ajungă la altă familie”. Emailul „Ultimul apel” pleacă doar dacă SMS-ul nu poate pleca sau nu ajunge. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. 0 = fără.</p></td></tr>
+					<tr><th><label for="pay_reminders"><?php echo self::channel( 'email', true ); // phpcs:ignore ?>Reamintiri pe email</label></th><td><input type="text" name="pay_reminders" id="pay_reminders" value="<?php echo esc_attr( (string) $s['pay_reminders'] ); ?>" class="regular-text" placeholder="24, 12, 3"> ore înainte de expirare <p class="description">Câte un email la fiecare interval, de exemplu „24, 12, 3”. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. Gol = fără reamintiri.</p></td></tr>
+					<tr><th><label for="last_call_minutes"><?php echo self::channel( 'sms', true ); // phpcs:ignore ?>Ultimul apel pe SMS</label></th><td><input type="number" min="0" max="180" name="last_call_minutes" id="last_call_minutes" value="<?php echo esc_attr( (string) $s['last_call_minutes'] ); ?>" class="small-text"> minute înainte de expirare <p class="description">SMS: „plătește până la …, ca ora să nu ajungă la altă familie”. Emailul „Ultimul apel” pleacă doar dacă SMS-ul nu poate pleca sau nu ajunge. Noaptea (22:00–08:00) nu pleacă: se trimite la 08:00 sau la 21:30, cu o seară înainte. 0 = fără.</p></td></tr>
 					<tr><th>Reducere de început de sezon</th><td>
 						<p><label><input type="checkbox" name="early_enabled" value="1" <?php checked( ! empty( $s['early_enabled'] ) ); ?>> Activă</label></p>
 						<p><label><input type="number" min="0" step="1" name="early_amount" value="<?php echo esc_attr( (string) $s['early_amount'] ); ?>" class="small-text"> lei reducere</label>
@@ -1399,6 +1478,11 @@ class SCP_Admin {
 				'emails'           => $emails,
 			)
 		);
+
+		// Textele SMS se editează tot aici, în „Emailuri și SMS”; restul setărilor SMS rămân pe pagina SMS.
+		if ( ! empty( $p['sms_tpl_form'] ) && ! empty( $p['sms_form'] ) ) {
+			SCP_SMS_Admin::save_from_settings( (array) ( $p['sms'] ?? array() ), (array) ( $p['sms_tpl'] ?? array() ) );
+		}
 
 		if ( ! empty( $p['create_voucher_product'] ) ) {
 			$made = self::create_voucher_product();
