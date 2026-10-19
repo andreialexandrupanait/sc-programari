@@ -61,13 +61,13 @@ class SCP_Admin {
 			.scpw-label { display: block; font-size: 11.5px; color: #6f685c; }
 			.scpw-value { display: block; font-size: 22px; line-height: 1.25; }
 			.scpw-sub { display: block; font-size: 11.5px; color: #6f685c; }
-			.scpw-tile--warn { background: #fdf7e8; border-color: #e6cf98; }
-			.scpw-tile--ok { background: #eef4ea; border-color: #c4d8b8; }
-			.scpw-tile--free { background: #f3effa; border-color: #d5c9ee; }
+			.scpw-tile--warn { background: #fff7ed; border-color: #f59e0b; }
+			.scpw-tile--ok { background: #f1faf3; border-color: #8fcf9f; }
+			.scpw-tile--free { background: #f3e8ff; border-color: #c084fc; }
 			.scpw-h { margin: 14px 0 6px !important; font-size: 13px !important; font-weight: 600 !important; }
 			.scpw-list { margin: 0; }
 			.scpw-list li { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 6px 0; border-top: 1px solid #f0ece4; font-size: 12.5px; }
-			.scpw-list small { color: #8a6a22; white-space: nowrap; }
+			.scpw-list small { color: #b45309; white-space: nowrap; }
 			.scpw-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 		</style>
 		<div class="scpw-grid">

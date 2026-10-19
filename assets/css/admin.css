@@ -537,7 +537,7 @@ a.scp-kpi:hover { border-color: var(--g); color: inherit; }
 .scp-cal-table thead th.scp-cal-xh small { display: block; font-size: 10px; font-weight: 600; color: var(--gold, #b8933f); text-transform: uppercase; letter-spacing: .04em; }
 
 /* Aceeași lățime pe toate paginile modulului (Panou, programări, calendar, vouchere, setări, SMS) */
-.scp-admin, .scp-admin.scp-admin--wide, .scp-admin.scp-admin--full { max-width: 1440px; }
+.scp-admin, .scp-admin.scp-admin--wide, .scp-admin.scp-admin--full { max-width: 1584px; }
 .scp-admin .scp-settings { max-width: none; }
 
 /* Ora extra care lipsește dintr-o zi: căsuță punctată, din care o poți adăuga */
@@ -545,3 +545,62 @@ a.scp-kpi:hover { border-color: var(--g); color: inherit; }
 .scp-cell--add .scp-cell-meta { opacity: .75; }
 .scp-cell--add:hover { border-color: var(--g); border-style: solid; background: #fff; }
 .scp-cell--add:hover .scp-cell-meta { opacity: 1; color: var(--g); }
+
+/* ===== Culorile statusurilor: fiecare stare are culoarea ei, ușor de deosebit =====
+   plătită = verde · plată la studio = albastru · așteaptă plata = portocaliu · gratuită = mov
+   anulată = roșu · neplătită = gri · finalizată = turcoaz · neprezentat = ardezie */
+.scp-admin {
+	--st-paid: #1e7b3a; --st-paid-soft: #dcf2e2; --st-paid-line: #8fcf9f;
+	--st-studio: #1c5bb0; --st-studio-soft: #e0ecfc; --st-studio-line: #8fb6ec;
+	--st-await: #b45309; --st-await-soft: #ffedd5; --st-await-line: #f59e0b;
+	--st-free: #7e22ce; --st-free-soft: #f3e8ff; --st-free-line: #c084fc;
+	--st-cancel: #b91c1c; --st-cancel-soft: #fee2e2; --st-cancel-line: #f87171;
+	--st-unpaid: #57534e; --st-unpaid-soft: #eceae6; --st-unpaid-line: #b5afa6;
+	--st-done: #0f766e; --st-done-soft: #ccfbf1;
+	--st-noshow: #334155; --st-noshow-soft: #e2e8f0;
+}
+.scp-badge--ps-paid, .scp-badge--pay-paid, .scp-badge--pay-cash, .scp-badge--pay-card, .scp-badge--pay-voucher, .scp-badge--status-confirmed, .scp-badge--voucher-active { background: var(--st-paid-soft); color: var(--st-paid); box-shadow: inset 0 0 0 1px var(--st-paid-line); }
+.scp-badge--ps-studio, .scp-badge--studio { background: var(--st-studio-soft); color: var(--st-studio); box-shadow: inset 0 0 0 1px var(--st-studio-line); }
+.scp-badge--ps-awaiting, .scp-badge--status-pending, .scp-badge--pay-link_sent { background: var(--st-await-soft); color: var(--st-await); box-shadow: inset 0 0 0 1px var(--st-await-line); }
+.scp-badge--ps-free, .scp-badge--pay-free { background: var(--st-free-soft); color: var(--st-free); box-shadow: inset 0 0 0 1px var(--st-free-line); }
+.scp-badge--status-cancelled, .scp-badge--voucher-cancelled { background: var(--st-cancel-soft); color: var(--st-cancel); box-shadow: inset 0 0 0 1px var(--st-cancel-line); }
+.scp-badge--ps-unpaid, .scp-badge--ps-none, .scp-badge--pay-unpaid, .scp-badge--voucher-used { background: var(--st-unpaid-soft); color: var(--st-unpaid); box-shadow: inset 0 0 0 1px var(--st-unpaid-line); }
+.scp-badge--status-completed { background: var(--st-done-soft); color: var(--st-done); }
+.scp-badge--status-no_show { background: var(--st-noshow-soft); color: var(--st-noshow); }
+.scp-table tr.is-cancelled td { opacity: .7; }
+.scp-table tr.is-cancelled td:first-child { box-shadow: inset 4px 0 0 var(--st-cancel-line); }
+
+/* Calendar: căsuțele ocupate, după starea plății */
+.scp-cell--booked { background: var(--st-paid); border-color: var(--st-paid); color: #fff; }
+.scp-cell--booked .scp-cell-meta, .scp-cell--booked .scp-cell-line { color: #d7f0dd; }
+.scp-cell--booked:hover { background: #155c2a; border-color: #155c2a; color: #fff; }
+.scp-cell--booked.pay-studio { background: var(--st-studio-soft); border-color: var(--st-studio-line); color: #123f7a; }
+.scp-cell--booked.pay-awaiting { background: var(--st-await-soft); border-color: var(--st-await-line); color: #7c2d12; }
+.scp-cell--booked.pay-free { background: var(--st-free-soft); border-color: var(--st-free-line); color: #581c87; }
+.scp-cell--booked.pay-unpaid { background: var(--st-unpaid-soft); border-color: var(--st-unpaid-line); color: #292524; }
+.scp-cell--booked.pay-studio .scp-cell-meta, .scp-cell--booked.pay-studio .scp-cell-line { color: var(--st-studio); }
+.scp-cell--booked.pay-awaiting .scp-cell-meta, .scp-cell--booked.pay-awaiting .scp-cell-line { color: var(--st-await); }
+.scp-cell--booked.pay-free .scp-cell-meta, .scp-cell--booked.pay-free .scp-cell-line { color: var(--st-free); }
+.scp-cell--booked.pay-unpaid .scp-cell-meta, .scp-cell--booked.pay-unpaid .scp-cell-line { color: var(--st-unpaid); }
+.scp-cell--booked.pay-studio:hover { background: var(--st-studio); border-color: var(--st-studio); color: #fff; }
+.scp-cell--booked.pay-awaiting:hover { background: var(--st-await); border-color: var(--st-await); color: #fff; }
+.scp-cell--booked.pay-free:hover { background: var(--st-free); border-color: var(--st-free); color: #fff; }
+.scp-cell--booked.pay-unpaid:hover { background: var(--st-unpaid); border-color: var(--st-unpaid); color: #fff; }
+.scp-cell--booked.pay-studio:hover .scp-cell-meta, .scp-cell--booked.pay-studio:hover .scp-cell-line,
+.scp-cell--booked.pay-awaiting:hover .scp-cell-meta, .scp-cell--booked.pay-awaiting:hover .scp-cell-line,
+.scp-cell--booked.pay-free:hover .scp-cell-meta, .scp-cell--booked.pay-free:hover .scp-cell-line,
+.scp-cell--booked.pay-unpaid:hover .scp-cell-meta, .scp-cell--booked.pay-unpaid:hover .scp-cell-line { color: #fff; }
+
+/* Legenda calendarului */
+.scp-lg--booked::before { background: var(--st-paid); border-color: var(--st-paid); }
+.scp-lg--studio::before { background: var(--st-studio-soft); border-color: var(--st-studio-line); }
+.scp-lg--awaiting::before { background: var(--st-await-soft); border-color: var(--st-await-line); }
+.scp-lg--gift::before { background: var(--st-free-soft); border-color: var(--st-free-line); }
+
+/* Cifrele din Panou, în aceleași culori */
+.scp-kpi--ok { background: #f1faf3; border-color: var(--st-paid-line); }
+.scp-kpi--warn { background: #fff7ed; border-color: var(--st-await-line); }
+.scp-kpi-sub--free { color: var(--st-free); }
+.scp-mini-expiry { color: var(--st-await); }
+.scp-td-expiry { color: var(--st-await); }
+.scp-td-expiry.is-soon { color: var(--st-cancel); }
