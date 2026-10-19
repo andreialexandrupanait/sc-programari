@@ -175,7 +175,7 @@
 .scp-cell-name { font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .scp-cell-meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scp-cell--free .scp-cell-meta { color: var(--g); }
-.scp-cell.is-extra { border-style: dashed; }
+
 .scp-cell--booked { background: var(--g); border-color: var(--g); color: #fff; }
 .scp-cell--booked .scp-cell-meta { color: #cfe0c7; }
 .scp-cell--booked.is-plus { box-shadow: inset 4px 0 0 var(--gold); }
@@ -446,12 +446,6 @@
 @media (max-width: 600px) { .scp-tabs { top: 0; } .scp-settings section { scroll-margin-top: 64px; } }
 @media (max-width: 782px) { .scp-pkg-add { min-height: 52px; } }
 
-/* Ore extra (adăugate într-o singură zi): o singură coloană, cu ora pe fiecare card */
-.scp-cal-table thead th.scp-cal-extrah { width: 112px; }
-.scp-cell-xlist { display: flex; flex-direction: column; gap: 4px; }
-.scp-cell--x { min-height: 0; padding: 4px 8px; }
-.scp-cell-time { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
-.scp-cell--booked .scp-cell-time { color: inherit; opacity: .85; }
 
 /* Ședințe oferite gratuit: lila, ca să se distingă de cele plătite */
 .scp-cell--booked.pay-free { background: #ece6f7; border-color: #a893d6; color: #43307a; }
@@ -537,3 +531,12 @@ a.scp-kpi:hover { border-color: var(--g); color: inherit; }
 @media (max-width: 1500px) { .scp-kpis--6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .scp-dash-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .scp-dash-stats { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 782px) { .scp-kpis--6, .scp-dash-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* Orele extra au aceeași căsuță ca cele standard; doar antetul le marchează */
+.scp-cal-table thead th.scp-cal-xh { color: var(--g-deep, #1f3a17); }
+.scp-cal-table thead th.scp-cal-xh small { display: block; font-size: 10px; font-weight: 600; color: var(--gold, #b8933f); text-transform: uppercase; letter-spacing: .04em; }
+
+/* Conținutul pluginului, mai lat peste tot */
+.scp-admin { max-width: 1680px; }
+.scp-admin.scp-admin--wide { max-width: none; }
+.scp-settings { max-width: 1400px; }
