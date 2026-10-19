@@ -19,6 +19,84 @@ class SCP_Admin {
 		add_action( 'admin_post_scp_resync', array( __CLASS__, 'resync_action' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( SCP_FILE ), array( __CLASS__, 'action_links' ) );
 		add_action( 'in_admin_header', array( __CLASS__, 'quiet_notices' ), 1000 );
+		add_action( 'wp_dashboard_setup', array( __CLASS__, 'dashboard_setup' ) );
+	}
+
+	/** Widgetul din Panoul de control WordPress, primul din coloana stângă. */
+	public static function dashboard_setup(): void {
+		if ( ! current_user_can( SCP_Install::CAP ) ) {
+			return;
+		}
+		wp_add_dashboard_widget( 'scp_dashboard', 'Programări Crăciun', array( __CLASS__, 'dashboard_widget' ) );
+		global $wp_meta_boxes;
+		$core = &$wp_meta_boxes['dashboard']['normal']['core'];
+		if ( isset( $core['scp_dashboard'] ) ) {
+			$core = array( 'scp_dashboard' => $core['scp_dashboard'] ) + $core;
+		}
+	}
+
+	/** „se anulează luni 21.10, 14:00 · în 5 ore” pentru o programare care așteaptă plata. */
+	private static function expiry_label( array $b, bool $short = false ): string {
+		if ( empty( $b['pay_by'] ) ) {
+			return 'nu se anulează (ședința e aproape)';
+		}
+		$at   = new DateTimeImmutable( (string) $b['pay_by'], SCP_Helpers::tz() );
+		$now  = SCP_Helpers::now();
+		$when = $short ? $at->format( 'd.m H:i' ) : SCP_Helpers::datetime_long( (string) $b['pay_by'] );
+		return $at <= $now ? 'termenul a trecut, se anulează acum' : $when . ' · în ' . human_time_diff( $now->getTimestamp(), $at->getTimestamp() );
+	}
+
+	public static function dashboard_widget(): void {
+		$s    = SCP_Bookings::summary();
+		$link = static fn( string $q ) => esc_url( admin_url( 'admin.php?' . $q ) );
+		$tile = static function ( string $label, string $value, string $sub = '', string $href = '', string $tone = '' ) {
+			echo '<a class="scpw-tile' . ( $tone ? ' scpw-tile--' . esc_attr( $tone ) : '' ) . '" href="' . esc_url( $href ) . '"><span class="scpw-label">' . esc_html( $label ) . '</span><b class="scpw-value">' . esc_html( $value ) . '</b>' . ( $sub ? '<span class="scpw-sub">' . esc_html( $sub ) . '</span>' : '' ) . '</a>';
+		};
+		?>
+		<style>
+			#scp_dashboard .inside { margin: 0; padding: 12px; }
+			.scpw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+			.scpw-tile { display: block; padding: 10px 12px; border: 1px solid #e2ddd2; border-radius: 8px; background: #fbfaf7; color: #23211d; text-decoration: none; }
+			.scpw-tile:hover { border-color: #2d661b; color: #23211d; }
+			.scpw-label { display: block; font-size: 11.5px; color: #6f685c; }
+			.scpw-value { display: block; font-size: 22px; line-height: 1.25; }
+			.scpw-sub { display: block; font-size: 11.5px; color: #6f685c; }
+			.scpw-tile--warn { background: #fdf7e8; border-color: #e6cf98; }
+			.scpw-tile--ok { background: #eef4ea; border-color: #c4d8b8; }
+			.scpw-tile--free { background: #f3effa; border-color: #d5c9ee; }
+			.scpw-h { margin: 14px 0 6px !important; font-size: 13px !important; font-weight: 600 !important; }
+			.scpw-list { margin: 0; }
+			.scpw-list li { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 6px 0; border-top: 1px solid #f0ece4; font-size: 12.5px; }
+			.scpw-list small { color: #8a6a22; white-space: nowrap; }
+			.scpw-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+		</style>
+		<div class="scpw-grid">
+			<?php
+			$tile( 'Programări active', (string) $s['active'], $s['target'] ? 'din ' . $s['target'] . ' (obiectiv)' : $s['last7'] . ' intrate în 7 zile', $link( 'page=scp-bookings&view=upcoming' ), '' );
+			$tile( 'Încasat', SCP_Helpers::money( $s['paid_v'] ) . ' lei', $s['paid_n'] . ( 1 === $s['paid_n'] ? ' programare plătită' : ' programări plătite' ), $link( 'page=scp-bookings&view=upcoming' ), 'ok' );
+			$tile( 'Așteaptă plata online', (string) $s['awaiting'], $s['expiring'] ? $s['expiring'] . ' se anulează în 24 de ore' : 'niciuna nu expiră în 24 de ore', $link( 'page=scp-bookings&view=awaiting' ), $s['expiring'] ? 'warn' : '' );
+			$tile( 'De încasat la studio', (string) $s['studio_n'], SCP_Helpers::money( $s['studio_v'] ) . ' lei, cash sau card', $link( 'page=scp-bookings&view=studio' ), '' );
+			$tile( 'Azi / mâine', $s['today'] . ' / ' . $s['tomorrow'], 'ședințe', $link( 'page=scp' ), '' );
+			$tile( 'Anulate', (string) $s['cancelled'], $s['expired'] . ' neplătite în termen', $link( 'page=scp-bookings&view=cancelled' ), '' );
+			if ( $s['free_n'] ) {
+				$tile( 'Gratuite (oferite)', (string) $s['free_n'], 'în valoare de ' . SCP_Helpers::money( $s['free_v'] ) . ' lei', $link( 'page=scp-bookings&view=all&payment_status=free' ), 'free' );
+			}
+			?>
+		</div>
+		<?php if ( $s['next'] ) : ?>
+			<h3 class="scpw-h">Se anulează automat, în ordine</h3>
+			<ul class="scpw-list">
+				<?php foreach ( $s['next'] as $b ) : ?>
+					<li><a href="<?php echo $link( 'page=scp-bookings&booking=' . (int) $b['id'] ); // phpcs:ignore ?>"><?php echo esc_html( $b['name'] . ' · ' . SCP_Helpers::date_ro( $b['slot_date'] ) . ' ' . $b['slot_time'] ); ?></a><small><?php echo esc_html( self::expiry_label( $b, true ) ); ?></small></li>
+				<?php endforeach; ?>
+			</ul>
+		<?php endif; ?>
+		<div class="scpw-actions">
+			<a class="button button-primary" href="<?php echo $link( 'page=scp-quick' ); // phpcs:ignore ?>">+ Programare</a>
+			<a class="button" href="<?php echo $link( 'page=scp' ); // phpcs:ignore ?>">Panou programări</a>
+			<a class="button" href="<?php echo $link( 'page=scp-calendar' ); // phpcs:ignore ?>">Calendar</a>
+		</div>
+		<?php
 	}
 
 	/** „+ Programare” în bara de sus, și pe site, și în admin (vizibil și pe telefon). */
@@ -206,7 +284,7 @@ class SCP_Admin {
 		$open = (bool) SCP_Settings::get( 'booking_open' );
 
 		$actions = '<a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=scp-quick' ) ) . '">+ Programare</a> <a class="button" href="' . esc_url( admin_url( 'admin.php?page=scp-calendar' ) ) . '">Calendar</a>';
-		self::header( 'Programări Crăciun', $actions );
+		self::header( 'Programări Crăciun', $actions, 'scp-admin--full' );
 
 		if ( ! $open ) {
 			echo '<div class="notice notice-warning inline"><p>Programările online sunt <strong>închise</strong>. Clienții văd mesajul din Setări. <a href="' . esc_url( admin_url( 'admin.php?page=scp-settings' ) ) . '">Deschide-le din Setări</a>.</p></div>';
@@ -224,8 +302,46 @@ class SCP_Admin {
 		foreach ( $s['today'] as $b ) {
 			$agenda[ $b['slot_date'] === $today ? 'Azi' : 'Mâine' ][1][] = $b;
 		}
+		$sum = $s['summary'];
 		?>
-		<div class="scp-grid-2">
+		<div class="scp-kpis scp-kpis--6">
+			<div class="scp-kpi scp-kpi--target">
+				<div class="scp-kpi-label">Programări active</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $s['active'] ); ?><span> din <?php echo esc_html( (string) $s['target'] ); ?></span></div>
+				<div class="scp-progress" role="img" aria-label="<?php echo esc_attr( $pct . '% din obiectiv' ); ?>"><span style="width:<?php echo esc_attr( (string) $pct ); ?>%"></span></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $pct . '% din obiectiv · ' . $s['last7'] . ' intrate în 7 zile' ); ?></div>
+			</div>
+			<a class="scp-kpi scp-kpi--ok" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&view=upcoming' ) ); ?>">
+				<div class="scp-kpi-label">Încasat</div>
+				<div class="scp-kpi-value"><?php echo esc_html( SCP_Helpers::money( $sum['paid_v'] ) ); ?><span> lei</span></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $sum['paid_n'] . ' programări plătite · valoare totală ' . SCP_Helpers::money( $s['value'] ) . ' lei' ); ?></div>
+			</a>
+			<a class="scp-kpi<?php echo $sum['expiring'] ? ' scp-kpi--warn' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&view=awaiting' ) ); ?>">
+				<div class="scp-kpi-label">Așteaptă plata online</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $sum['awaiting'] ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( ( $sum['expiring'] ? $sum['expiring'] . ' se anulează în 24 de ore' : 'niciuna nu expiră în 24 de ore' ) . ' · ' . SCP_Helpers::money( $sum['awaiting_v'] ) . ' lei' ); ?></div>
+			</a>
+			<a class="scp-kpi" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&view=studio' ) ); ?>">
+				<div class="scp-kpi-label">De încasat la studio</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $sum['studio_n'] ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( SCP_Helpers::money( $sum['studio_v'] ) . ' lei, cash sau card' ); ?></div>
+			</a>
+			<a class="scp-kpi" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&view=cancelled' ) ); ?>">
+				<div class="scp-kpi-label">Anulate</div>
+				<div class="scp-kpi-value"><?php echo esc_html( (string) $sum['cancelled'] ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $sum['expired'] . ' neplătite în termen · ' . ( $sum['cancelled'] - $sum['expired'] ) . ' din admin' ); ?></div>
+			</a>
+			<div class="scp-kpi">
+				<div class="scp-kpi-label">Ocupare de azi până la final</div>
+				<div class="scp-kpi-value"><?php echo esc_html( $occ . '%' ); ?></div>
+				<div class="scp-kpi-sub"><?php echo esc_html( $s['booked'] . ' ocupate · ' . $s['free'] . ' libere · ' . $s['blocked'] . ' blocate' ); ?></div>
+				<?php if ( $s['offered_n'] ) : ?>
+					<div class="scp-kpi-sub scp-kpi-sub--free"><?php echo esc_html( 'Gratuite: ' . $s['offered_n'] . ', în valoare de ' . SCP_Helpers::money( $s['offered_v'] ) . ' lei' ); ?></div>
+				<?php endif; ?>
+			</div>
+		</div>
+
+		<div class="scp-dash-row">
 			<div class="scp-panel">
 				<h2>Azi și mâine</h2>
 				<?php foreach ( $agenda as $label => $day ) : ?>
@@ -234,7 +350,7 @@ class SCP_Admin {
 				<?php endforeach; ?>
 			</div>
 			<div class="scp-panel">
-				<h2>Așteaptă plata online <small>se anulează singure la termen</small></h2>
+				<h2>Se anulează automat <a class="scp-h2-link" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&view=awaiting' ) ); ?>">vezi toate</a></h2>
 				<?php if ( ! $s['awaiting'] ) : ?>
 					<p class="scp-empty">Nimeni nu are de plătit acum.</p>
 				<?php else : ?>
@@ -242,8 +358,7 @@ class SCP_Admin {
 						<?php foreach ( $s['awaiting'] as $b ) : ?>
 							<li>
 								<a href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings&booking=' . $b['id'] ) ); ?>">
-									<span class="scp-mini-main"><strong><?php echo esc_html( $b['name'] ); ?></strong><span><?php echo esc_html( ucfirst( SCP_Helpers::date_long( $b['slot_date'] ) ) . ', ' . $b['slot_time'] . ' · ' . SCP_Helpers::money( $b['price'] ) . ' lei' ); ?></span></span>
-									<?php echo self::pay_badge( $b ); // phpcs:ignore ?>
+									<span class="scp-mini-main"><strong><?php echo esc_html( $b['name'] ); ?></strong><span><?php echo esc_html( ucfirst( SCP_Helpers::date_long( $b['slot_date'] ) ) . ', ' . $b['slot_time'] . ' · ' . SCP_Helpers::money( $b['price'] ) . ' lei' ); ?></span><span class="scp-mini-expiry"><?php echo esc_html( 'Se anulează ' . self::expiry_label( $b ) ); ?></span></span>
 								</a>
 								<?php if ( $b['phone'] ) : ?>
 									<a class="scp-mini-call" href="<?php echo esc_url( 'tel:' . preg_replace( '/[^0-9+]/', '', $b['phone'] ) ); ?>" aria-label="<?php echo esc_attr( 'Sună pe ' . $b['name'] ); ?>"><?php echo esc_html( $b['phone'] ); ?></a>
@@ -253,36 +368,6 @@ class SCP_Admin {
 					</ul>
 				<?php endif; ?>
 			</div>
-		</div>
-
-		<div class="scp-kpis">
-			<div class="scp-kpi scp-kpi--target">
-				<div class="scp-kpi-label">Programări active</div>
-				<div class="scp-kpi-value"><?php echo esc_html( (string) $s['active'] ); ?><span> din <?php echo esc_html( (string) $s['target'] ); ?></span></div>
-				<div class="scp-progress" role="img" aria-label="<?php echo esc_attr( $pct . '% din obiectiv' ); ?>"><span style="width:<?php echo esc_attr( (string) $pct ); ?>%"></span></div>
-				<div class="scp-kpi-sub"><?php echo esc_html( $pct . '% din obiectiv' ); ?></div>
-			</div>
-			<div class="scp-kpi">
-				<div class="scp-kpi-label">Intrate în ultimele 7 zile</div>
-				<div class="scp-kpi-value"><?php echo esc_html( (string) $s['last7'] ); ?></div>
-				<div class="scp-kpi-sub"><?php echo esc_html( $s['cancelled'] . ' anulate în total' ); ?></div>
-			</div>
-			<div class="scp-kpi">
-				<div class="scp-kpi-label">Ocupare de azi până la final</div>
-				<div class="scp-kpi-value"><?php echo esc_html( $occ . '%' ); ?></div>
-				<div class="scp-kpi-sub"><?php echo esc_html( $s['booked'] . ' ocupate · ' . $s['free'] . ' libere · ' . $s['blocked'] . ' blocate' ); ?></div>
-			</div>
-			<div class="scp-kpi">
-				<div class="scp-kpi-label">Valoarea programărilor active</div>
-				<div class="scp-kpi-value"><?php echo esc_html( SCP_Helpers::money( $s['value'] ) ); ?><span> lei</span></div>
-				<div class="scp-kpi-sub"><?php echo esc_html( 'Încasat: ' . SCP_Helpers::money( $paid ) . ' lei (' . $paid_n . ' programări)' ); ?></div>
-				<?php if ( $s['offered_n'] ) : ?>
-					<div class="scp-kpi-sub scp-kpi-sub--free"><?php echo esc_html( 'Gratuite: ' . $s['offered_n'] . ( 1 === $s['offered_n'] ? ' ședință oferită' : ' ședințe oferite' ) . ', în valoare de ' . SCP_Helpers::money( $s['offered_v'] ) . ' lei' ); ?></div>
-				<?php endif; ?>
-			</div>
-		</div>
-
-		<div class="scp-grid-2">
 			<div class="scp-panel">
 				<h2>Următoarele ședințe <a class="scp-h2-link" href="<?php echo esc_url( admin_url( 'admin.php?page=scp-bookings' ) ); ?>">vezi toate</a></h2>
 				<?php self::mini_list( $s['upcoming'], 'Nu există alte ședințe viitoare.', true ); ?>
@@ -293,20 +378,19 @@ class SCP_Admin {
 			</div>
 		</div>
 
-		<details class="scp-panel scp-stats">
-			<summary>Statistici sezon</summary>
-			<div class="scp-grid-2">
-				<div>
-					<h3>Programări noi pe zile <small>ultimele 30 de zile</small></h3>
-					<?php self::bars( $s['per_day'] ); ?>
-				</div>
-				<div>
-					<?php self::split( 'Pachet', $s['by_package'], 'package', fn( $k ) => self::pkg_label( $k ), $s['active'] ); ?>
-					<?php self::split( 'Plată', $s['by_pay'], 'payment_status', fn( $k ) => SCP_Helpers::PAYMENT_STATUSES[ $k ] ?? $k, $s['active'] ); ?>
-					<?php self::split( 'Sursă', $s['by_source'], 'source', fn( $k ) => SCP_Helpers::SOURCES[ $k ] ?? $k, $s['active'] ); ?>
-				</div>
+		<div class="scp-dash-stats">
+			<div class="scp-panel">
+				<h2>Programări noi pe zile <small>ultimele 30 de zile</small></h2>
+				<?php self::bars( $s['per_day'] ); ?>
 			</div>
-		</details>
+			<div class="scp-panel">
+				<?php self::split( 'Plată', $s['by_pay'], 'payment_status', fn( $k ) => SCP_Helpers::PAYMENT_STATUSES[ $k ] ?? $k, $s['active'] ); ?>
+			</div>
+			<div class="scp-panel">
+				<?php self::split( 'Pachet', $s['by_package'], 'package', fn( $k ) => self::pkg_label( $k ), $s['active'] ); ?>
+				<?php self::split( 'Sursă', $s['by_source'], 'source', fn( $k ) => SCP_Helpers::SOURCES[ $k ] ?? $k, $s['active'] ); ?>
+			</div>
+		</div>
 		<?php
 		self::footer();
 	}
@@ -453,7 +537,7 @@ class SCP_Admin {
 
 	const VIEWS = array(
 		'upcoming'  => 'Următoare',
-		'awaiting'  => 'Așteaptă plata',
+		'awaiting'  => 'Se anulează automat',
 		'studio'    => 'De încasat la studio',
 		'past'      => 'Trecute',
 		'cancelled' => 'Anulate',
@@ -476,7 +560,7 @@ class SCP_Admin {
 			'from'           => isset( $g['from'] ) ? sanitize_text_field( $g['from'] ) : '',
 			'to'             => isset( $g['to'] ) ? sanitize_text_field( $g['to'] ) : '',
 			'search'         => isset( $g['s'] ) ? sanitize_text_field( $g['s'] ) : '',
-			'orderby'        => isset( $g['orderby'] ) ? sanitize_key( $g['orderby'] ) : 'slot',
+			'orderby'        => isset( $g['orderby'] ) ? sanitize_key( $g['orderby'] ) : ( 'awaiting' === $view ? 'pay_by' : 'slot' ),
 			'order'          => isset( $g['order'] ) ? sanitize_key( $g['order'] ) : ( in_array( $view, array( 'past', 'cancelled' ), true ) ? 'desc' : 'asc' ),
 			'page'           => isset( $g['paged'] ) ? max( 1, (int) $g['paged'] ) : 1,
 			'per_page'       => 50,
@@ -540,6 +624,7 @@ class SCP_Admin {
 						<select name="orderby">
 							<option value="slot" <?php selected( $f['orderby'], 'slot' ); ?>>După data ședinței</option>
 							<option value="created" <?php selected( $f['orderby'], 'created' ); ?>>Ultimele intrate întâi</option>
+							<option value="pay_by" <?php selected( $f['orderby'], 'pay_by' ); ?>>După termenul de plată (cine se anulează primul)</option>
 						</select>
 					</label>
 					<div class="scp-more-actions"><button class="button">Aplică</button> <a href="<?php echo esc_url( add_query_arg( 'view', $f['view'], $base ) ); ?>">Resetează</a></div>
@@ -549,9 +634,9 @@ class SCP_Admin {
 				<input type="hidden" name="order" value="desc">
 			<?php endif; ?>
 		</form>
-		<p class="scp-count"><?php echo esc_html( $q['total'] . ( 1 === $q['total'] ? ' programare' : ' programări' ) ); ?></p>
+		<p class="scp-count"><?php echo esc_html( $q['total'] . ( 1 === $q['total'] ? ' programare' : ' programări' ) ); ?><?php echo 'awaiting' === $f['view'] ? esc_html( ' care așteaptă plata online, în ordinea în care se anulează automat dacă nu plătesc.' ) : ''; ?></p>
 		<div class="scp-panel scp-panel--flush">
-			<?php self::table( $q['items'] ); ?>
+			<?php self::table( $q['items'], false, 'awaiting' === $f['view'] ); ?>
 		</div>
 		<?php
 		$pages = (int) ceil( $q['total'] / $f['per_page'] );
@@ -570,12 +655,12 @@ class SCP_Admin {
 		self::footer();
 	}
 
-	private static function table( array $items, bool $compact = false ): void {
+	private static function table( array $items, bool $compact = false, bool $expiry = false ): void {
 		if ( ! $items ) {
 			echo '<p class="scp-empty scp-empty--pad">Nicio programare aici.</p>';
 			return;
 		}
-		echo '<table class="scp-table"><thead><tr><th>Ședința</th><th>Client</th><th>Pachet</th><th>Stare</th>';
+		echo '<table class="scp-table"><thead><tr>' . ( $expiry ? '<th>Se anulează</th>' : '' ) . '<th>Ședința</th><th>Client</th><th>Pachet</th><th>Stare</th>';
 		if ( ! $compact ) {
 			echo '<th>Sursă</th>';
 		}
@@ -584,6 +669,10 @@ class SCP_Admin {
 			$url = admin_url( 'admin.php?page=scp-bookings&booking=' . $b['id'] );
 			$cls = 'cancelled' === $b['status'] ? ' class="is-cancelled"' : '';
 			echo '<tr' . $cls . ' data-href="' . esc_url( $url ) . '">'; // phpcs:ignore
+			if ( $expiry ) {
+				$soon = ! empty( $b['pay_by'] ) && strtotime( (string) $b['pay_by'] ) - SCP_Helpers::now()->getTimestamp() < DAY_IN_SECONDS;
+				echo '<td class="scp-td-expiry' . ( $soon ? ' is-soon' : '' ) . '">' . esc_html( self::expiry_label( $b, true ) ) . '</td>';
+			}
 			echo '<td class="scp-td-slot"><a href="' . esc_url( $url ) . '"><strong>' . esc_html( SCP_Helpers::date_ro( $b['slot_date'] ) ) . '</strong> <span>' . esc_html( $b['slot_time'] ) . '</span><small>' . esc_html( SCP_Helpers::WEEKDAYS[ SCP_Helpers::weekday( $b['slot_date'] ) ] ) . '</small></a></td>';
 			echo '<td><strong>' . esc_html( $b['name'] ) . '</strong><small>' . esc_html( trim( $b['phone'] . ( $b['email'] ? ' · ' . $b['email'] : '' ), ' ·' ) ) . '</small></td>';
 			echo '<td>' . esc_html( self::pkg_label( $b['package'] ) ) . '<small>' . esc_html( SCP_Helpers::money( $b['price'] ) ) . ' lei</small></td>';

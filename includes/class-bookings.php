@@ -878,6 +878,7 @@ class SCP_Bookings {
 			'slot'    => 'slot_date %s, slot_time %s',
 			'created' => 'created_at %s',
 			'name'    => 'name %s',
+			'pay_by'  => 'pay_by IS NULL, pay_by %s, slot_date %s, slot_time %s',
 		);
 		$orderby = $orderby_map[ $args['orderby'] ?? 'slot' ] ?? $orderby_map['slot'];
 		$order   = 'desc' === strtolower( $args['order'] ?? 'asc' ) ? 'DESC' : 'ASC';
@@ -995,7 +996,55 @@ class SCP_Bookings {
 			'upcoming'   => $upcoming,
 			'awaiting'   => $awaiting,
 			'recent'     => $recent,
+			'summary'    => self::summary(),
 		);
+	}
+
+	/**
+	 * Cifrele principale, din câteva interogări ușoare (widgetul din Panoul de control WordPress și Panoul pluginului).
+	 * „Încasat” = plătite online, cash, card sau cu voucher; cele gratuite sunt separat.
+	 */
+	public static function summary(): array {
+		global $wpdb;
+		$t      = self::table();
+		$now    = SCP_Helpers::now();
+		$paid   = "'paid','cash','card','voucher'";
+		$all    = SCP_Helpers::paid_sql();
+		$r      = (array) $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COALESCE(SUM(active_slot IS NOT NULL),0) active,
+					COALESCE(SUM(status = 'cancelled'),0) cancelled,
+					COALESCE(SUM(status = 'cancelled' AND cancel_reason = 'expired'),0) expired,
+					COALESCE(SUM(active_slot IS NOT NULL AND payment_status IN ({$paid})),0) paid_n,
+					COALESCE(SUM(CASE WHEN active_slot IS NOT NULL AND payment_status IN ({$paid}) THEN price END),0) paid_v,
+					COALESCE(SUM(active_slot IS NOT NULL AND payment_status = 'free'),0) free_n,
+					COALESCE(SUM(CASE WHEN active_slot IS NOT NULL AND payment_status = 'free' THEN list_price END),0) free_v,
+					COALESCE(SUM(status = 'pending'),0) awaiting,
+					COALESCE(SUM(CASE WHEN status = 'pending' THEN price END),0) awaiting_v,
+					COALESCE(SUM(status = 'pending' AND pay_by IS NOT NULL AND pay_by <= %s),0) expiring,
+					COALESCE(SUM(status = 'confirmed' AND payment_status NOT IN ({$all})),0) studio_n,
+					COALESCE(SUM(CASE WHEN status = 'confirmed' AND payment_status NOT IN ({$all}) THEN price END),0) studio_v,
+					COALESCE(SUM(active_slot IS NOT NULL AND slot_date = %s),0) today,
+					COALESCE(SUM(active_slot IS NOT NULL AND slot_date = %s),0) tomorrow,
+					COALESCE(SUM(created_at >= %s),0) last7
+				FROM {$t}",
+				$now->modify( '+24 hours' )->format( 'Y-m-d H:i:s' ),
+				$now->format( 'Y-m-d' ),
+				$now->modify( '+1 day' )->format( 'Y-m-d' ),
+				$now->modify( '-6 days' )->format( 'Y-m-d 00:00:00' )
+			),
+			ARRAY_A
+		); // phpcs:ignore
+		$out = array( 'target' => (int) SCP_Settings::get( 'target', 0 ) );
+		foreach ( $r as $k => $v ) {
+			$out[ $k ] = str_ends_with( $k, '_v' ) ? (float) $v : (int) $v;
+		}
+		$out['next'] = array_map(
+			array( __CLASS__, 'hydrate' ),
+			$wpdb->get_results( "SELECT * FROM {$t} WHERE status = 'pending' AND pay_by IS NOT NULL ORDER BY pay_by LIMIT 5", ARRAY_A ) // phpcs:ignore
+		);
+		return $out;
 	}
 
 	/** Reprezentarea publică/externă a unei programări (folosită în webhook și export). */
