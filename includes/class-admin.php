@@ -20,6 +20,9 @@ class SCP_Admin {
 		add_filter( 'plugin_action_links_' . plugin_basename( SCP_FILE ), array( __CLASS__, 'action_links' ) );
 		add_action( 'in_admin_header', array( __CLASS__, 'quiet_notices' ), 1000 );
 		add_action( 'wp_dashboard_setup', array( __CLASS__, 'dashboard_setup' ) );
+		add_filter( 'admin_title', array( __CLASS__, 'hidden_title' ) );
+		add_filter( 'parent_file', array( __CLASS__, 'menu_parent' ), 999 );
+		add_filter( 'submenu_file', array( __CLASS__, 'menu_current' ), 999 );
 	}
 
 	/** Widgetul din Panoul de control WordPress, primul din coloana stângă. */
@@ -144,11 +147,48 @@ class SCP_Admin {
 		add_menu_page( 'Programări Crăciun', 'Programări' . $badge, $cap, self::SLUG, array( __CLASS__, 'page_dashboard' ), 'dashicons-calendar-alt', 26 );
 		add_submenu_page( self::SLUG, 'Panou', 'Panou', $cap, self::SLUG, array( __CLASS__, 'page_dashboard' ) );
 		add_submenu_page( self::SLUG, 'Programare rapidă', 'Programare rapidă', $cap, 'scp-quick', array( __CLASS__, 'page_quick' ) );
-		add_submenu_page( self::SLUG, 'Programări', 'Toate programările', $cap, 'scp-bookings', array( __CLASS__, 'page_bookings' ) );
-		add_submenu_page( self::SLUG, 'Calendar', 'Calendar și blocări', $cap, 'scp-calendar', array( __CLASS__, 'page_calendar' ) );
-		add_submenu_page( self::SLUG, 'Vouchere', 'Vouchere cadou', $cap, 'scp-vouchers', array( __CLASS__, 'page_vouchers' ) );
+		add_submenu_page( self::SLUG, 'Programări', 'Programări', $cap, 'scp-bookings', array( __CLASS__, 'page_bookings' ) );
+		add_submenu_page( self::SLUG, 'Calendar', 'Calendar', $cap, 'scp-calendar', array( __CLASS__, 'page_calendar' ) );
+		add_submenu_page( self::SLUG, 'Vouchere', 'Vouchere', $cap, 'scp-vouchers', array( __CLASS__, 'page_vouchers' ) );
 		add_submenu_page( self::SLUG, 'Setări', 'Setări', 'manage_options', 'scp-settings', array( __CLASS__, 'page_settings' ) );
-		add_submenu_page( self::SLUG, 'Sincronizare Sheet', 'Sincronizare Sheet', 'manage_options', 'scp-webhook', array( __CLASS__, 'page_webhook' ) );
+		// Fără loc în meniu: e o filă din Setări (parent gol = pagină ascunsă, dar accesibilă la aceeași adresă).
+		add_submenu_page( '', 'Sincronizare Google Sheet', 'Sincronizare Sheet', 'manage_options', 'scp-webhook', array( __CLASS__, 'page_webhook' ) );
+	}
+
+	/** Titlul din bara browserului pentru filele ascunse din Setări (SMS, Google Sheet). */
+	public static function hidden_title( $title ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore
+		$map  = array( 'scp-webhook' => 'Sincronizare Google Sheet', SCP_SMS_Admin::SLUG => 'SMS' );
+		return isset( $map[ $page ] ) ? $map[ $page ] . ' ‹ Setări ' . $title : $title;
+	}
+
+	/** Pe paginile SMS și Sincronizare Sheet, în meniu rămâne aprinsă „Setări”. */
+	public static function menu_parent( $parent ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore
+		return in_array( $page, array( 'scp-webhook', SCP_SMS_Admin::SLUG ), true ) ? self::SLUG : $parent;
+	}
+
+	public static function menu_current( $file ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore
+		return in_array( $page, array( 'scp-webhook', SCP_SMS_Admin::SLUG ), true ) ? 'scp-settings' : $file;
+	}
+
+	/** Filele de sus din Setări: setările generale, integrarea SMS și sincronizarea cu Google Sheet. */
+	public static function settings_nav( string $current ): void {
+		$tabs = array(
+			'scp-settings'      => 'Setări generale',
+			SCP_SMS_Admin::SLUG => 'SMS: integrare, teste și jurnal',
+			'scp-webhook'       => 'Sincronizare Google Sheet',
+		);
+		echo '<nav class="nav-tab-wrapper scp-pagetabs" aria-label="Setări">';
+		foreach ( $tabs as $slug => $label ) {
+			echo '<a href="' . esc_url( admin_url( 'admin.php?page=' . $slug ) ) . '" class="nav-tab' . ( $slug === $current ? ' nav-tab-active' : '' ) . '"' . ( $slug === $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a>';
+		}
+		echo '</nav>';
+		if ( 'scp-settings' !== $current ) {
+			// Filele ascunse nu au loc în meniu: deschidem „Programări” și aprindem „Setări”, ca pe celelalte pagini.
+			echo "<script>(function(){var li=document.getElementById('toplevel_page_scp');if(!li)return;li.classList.remove('wp-not-current-submenu');li.classList.add('wp-has-current-submenu','wp-menu-open');var a=li.querySelector('a.menu-top');if(a){a.classList.remove('wp-not-current-submenu');a.classList.add('wp-has-current-submenu','wp-menu-open');}})();</script>";
+		}
 	}
 
 	private static function today_count(): int {
@@ -1154,7 +1194,8 @@ class SCP_Admin {
 		}
 		$other_times = array_diff( $times, $grid );
 
-		self::header( 'Setări programări' );
+		self::header( 'Setări' );
+		self::settings_nav( 'scp-settings' );
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="scp-settings">
 			<?php wp_nonce_field( 'scp_save_settings' ); ?>
@@ -1230,7 +1271,7 @@ class SCP_Admin {
 			<section class="scp-panel" id="sms">
 				<h2><?php echo self::channel( 'sms', true ); // phpcs:ignore ?>SMS: trimitere și reamintiri</h2>
 				<?php SCP_SMS_Admin::settings_rows(); ?>
-				<p class="description">Textele SMS sunt mai jos, la „Emailuri și SMS”. Legătura cu SMSO (expeditorul), testele și jurnalul sunt pe <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . SCP_SMS_Admin::SLUG ) ); ?>">pagina SMS</a>.</p>
+				<p class="description">Textele SMS sunt mai jos, la „Emailuri și SMS”. Legătura cu SMSO (expeditorul), testele și jurnalul sunt în fila <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . SCP_SMS_Admin::SLUG ) ); ?>">SMS: integrare, teste și jurnal</a>.</p>
 			</section>
 
 			<section class="scp-panel" id="emailuri">
@@ -1789,7 +1830,8 @@ class SCP_Admin {
 	}
 
 	public static function page_webhook(): void {
-		self::header( 'Sincronizare Google Sheet' );
+		self::header( 'Setări' );
+		self::settings_nav( 'scp-webhook' );
 		global $wpdb;
 		$t      = SCP_Install::table( 'webhook_log' );
 		$url    = (string) SCP_Settings::get( 'webhook_url' );

@@ -604,3 +604,11 @@ a.scp-kpi:hover { border-color: var(--g); color: inherit; }
 .scp-mini-expiry { color: var(--st-await); }
 .scp-td-expiry { color: var(--st-await); }
 .scp-td-expiry.is-soon { color: var(--st-cancel); }
+
+/* Gradul de ocupare al zilei (coloana „Ocupat”) */
+.scp-occ { display: inline-block; min-width: 38px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; text-align: center; }
+.scp-occ.is-empty { color: var(--muted); background: #f3f0ea; }
+.scp-occ.is-full { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #1e7b3a; }
+
+/* Filele din Setări (setări generale, SMS, Google Sheet) */
+.scp-pagetabs { margin: 4px 0 18px; }

@@ -84,7 +84,8 @@ class SCP_SMS_Admin {
 	}
 
 	public static function menu(): void {
-		add_submenu_page( SCP_Admin::SLUG, 'SMS', 'SMS', 'manage_options', self::SLUG, array( __CLASS__, 'page' ) );
+		// Fără loc în meniu: e fila „SMS” din Setări (pagina rămâne la aceeași adresă).
+		add_submenu_page( '', 'SMS', 'SMS', 'manage_options', self::SLUG, array( __CLASS__, 'page' ) );
 	}
 
 	private static function back( string $msg = '', string $anchor = '' ): void {
@@ -258,7 +259,8 @@ class SCP_SMS_Admin {
 		$pill = static fn( string $text, string $kind ) => '<span class="scp-pill scp-pill--' . esc_attr( $kind ) . '">' . esc_html( $text ) . '</span>';
 		?>
 		<div class="wrap scp-admin scp-sms">
-			<h1>SMS către clienți</h1>
+			<h1>Setări</h1>
+			<?php SCP_Admin::settings_nav( self::SLUG ); ?>
 			<?php if ( $msg ) : ?><div class="notice notice-info is-dismissible"><p><?php echo esc_html( $msg ); ?></p></div><?php endif; ?>
 
 			<section class="scp-panel">

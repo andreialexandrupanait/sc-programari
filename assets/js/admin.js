@@ -124,6 +124,13 @@
 		}).catch(function (e) { self.body.textContent = e.message; });
 	};
 
+	/** „3/6”, colorat ca o formatare condiționată: cu cât ziua e mai plină, cu atât e mai verde. */
+	function occBadge(booked, cap) {
+		var r = cap ? booked / cap : 0;
+		var st = booked ? 'background:rgba(30,123,58,' + (0.14 + r * 0.86).toFixed(2) + ');color:' + (r >= 0.5 ? '#fff' : '#155c2a') : '';
+		return el('span', { class: 'scp-occ' + (r >= 1 ? ' is-full' : '') + (booked ? '' : ' is-empty'), style: st, title: booked + ' din ' + cap + ' ore ocupate', text: booked + '/' + cap });
+	}
+
 	/** În căsuță: numele și primul prenume („Popescu Ana Maria” → „Popescu Ana”); numele întreg rămâne în panou. */
 	function shortName(name) {
 		var p = String(name || '').trim().split(/\s+/);
@@ -199,8 +206,11 @@
 			cols.forEach(function (t) {
 				var s = bySlot[t];
 				if (s) { tr.appendChild(el('td', {}, [cellBtn(s)])); return; }
-				// Ora extra lipsește din această zi: căsuță goală, de pe care o poți adăuga și aici.
-				if (!std[t] && hasProgram && !day.day_blocked && day.date >= A.today) {
+				// O oră extra care lipsește din zi se afișează ca orele normale ale zilei:
+				// zi închisă → „blocat”, zi trecută → „–”, zi fără program → nimic, altfel „+ adaugă”.
+				if (!std[t] && day.day_blocked) { tr.appendChild(el('td', {}, [cellBtn({ time: t, state: 'blocked', kind: 'extra', reason: day.day_reason || '' })])); return; }
+				if (!std[t] && hasProgram && day.date < A.today) { tr.appendChild(el('td', {}, [cellBtn({ time: t, state: 'past', kind: 'extra' })])); return; }
+				if (!std[t] && hasProgram && day.date >= A.today) {
 					tr.appendChild(el('td', {}, [el('button', {
 						type: 'button', class: 'scp-cell scp-cell--add' + (self.sel && self.sel.date === day.date && self.sel.time === t ? ' is-selected' : ''), 'data-slot': day.date + ' ' + t,
 						'aria-label': day.label + ' ' + t + ': ora nu e în programul zilei',
@@ -210,7 +220,7 @@
 				}
 				tr.appendChild(el('td', { class: 'scp-cell scp-cell--none' }));
 			});
-			tr.appendChild(el('td', { class: 'scp-cal-sum' }, [cap ? el('span', { text: booked + '/' + cap }) : el('span', { class: 'scp-muted', text: '–' })]));
+			tr.appendChild(el('td', { class: 'scp-cal-sum' }, [cap ? occBadge(booked, cap) : el('span', { class: 'scp-muted', text: '–' })]));
 			tb.appendChild(tr);
 		});
 		table.appendChild(tb);
