@@ -127,15 +127,20 @@
 	Calendar.prototype.render = function () {
 		var self = this, d = this.data;
 		if (!d) return;
-		var times = {};
-		(d.times || []).forEach(function (t) { times[t] = 1; });
-		d.days.forEach(function (day) { day.slots.forEach(function (s) { times[s.time] = 1; }); });
-		var cols = Object.keys(times).sort();
+		// Coloane doar pentru programul standard; orele adăugate într-o singură zi stau în coloana „Ore extra”,
+		// ca o oră pusă o dată să nu adauge o coloană goală pe toată luna.
+		var std = {};
+		(d.times || []).forEach(function (t) { std[t] = 1; });
+		var cols = Object.keys(std).sort();
 		var hide = this.hideClosed.checked;
+		var hasExtra = d.days.some(function (day) {
+			return (!hide || day.slots.length || day.day_blocked) && day.slots.some(function (s) { return !std[s.time]; });
+		});
 
 		var table = el('table', { class: 'scp-cal-table' });
 		var head = el('tr', {}, [el('th', { class: 'scp-cal-dayh', text: 'Ziua' })]);
 		cols.forEach(function (t) { head.appendChild(el('th', { text: t })); });
+		if (hasExtra) head.appendChild(el('th', { class: 'scp-cal-extrah', text: 'Ore extra' }));
 		head.appendChild(el('th', { class: 'scp-cal-sum', text: 'Ocupat' }));
 		table.appendChild(el('thead', {}, [head]));
 		var tb = el('tbody');
@@ -160,11 +165,10 @@
 			]);
 			var tr = el('tr', { class: (isToday ? 'is-today ' : '') + (weekend ? 'is-weekend ' : '') + (day.day_blocked ? 'is-dayblocked' : '') }, [dayCell]);
 
-			cols.forEach(function (t) {
-				var s = bySlot[t];
-				if (!s) { tr.appendChild(el('td', { class: 'scp-cell scp-cell--none' })); return; }
+			var cellBtn = function (s, withTime) {
+				var t = s.time;
 				var cls = 'scp-cell scp-cell--' + s.state + (s.kind === 'extra' ? ' is-extra' : '');
-				var content = [];
+				var content = withTime ? [el('span', { class: 'scp-cell-time', text: t })] : [];
 				if (s.state === 'booked' && s.booking) {
 					var ps = s.booking.pay || { key: s.booking.payment_status, short: PAY[s.booking.payment_status] || '' };
 					cls += ' pay-' + ps.key + (s.booking.plus ? ' is-plus' : '');
@@ -173,17 +177,24 @@
 				} else if (s.state === 'blocked') {
 					content.push(el('span', { class: 'scp-cell-meta', text: s.reason || 'blocat' }));
 				} else if (s.state === 'free') {
-					content.push(el('span', { class: 'scp-cell-meta', text: s.kind === 'extra' ? 'liber · extra' : 'liber' }));
+					content.push(el('span', { class: 'scp-cell-meta', text: 'liber' }));
 				} else {
 					content.push(el('span', { class: 'scp-cell-meta', text: '–' }));
 				}
-				var td = el('td', {}, [el('button', {
-					type: 'button', class: cls + (self.sel && self.sel.date === day.date && self.sel.time === t ? ' is-selected' : ''), 'data-slot': day.date + ' ' + t,
+				return el('button', {
+					type: 'button', class: cls + (withTime ? ' scp-cell--x' : '') + (self.sel && self.sel.date === day.date && self.sel.time === t ? ' is-selected' : ''), 'data-slot': day.date + ' ' + t,
 					'aria-label': day.label + ' ' + t + ': ' + (s.state === 'booked' && s.booking ? s.booking.name : ({ free: 'liber', blocked: 'blocat', past: 'trecut' })[s.state] || s.state),
 					onclick: function () { self.closePop(); self.select(day, s); }
-				}, content)]);
-				tr.appendChild(td);
+				}, content);
+			};
+			cols.forEach(function (t) {
+				var s = bySlot[t];
+				tr.appendChild(s ? el('td', {}, [cellBtn(s, false)]) : el('td', { class: 'scp-cell scp-cell--none' }));
 			});
+			if (hasExtra) {
+				var extras = day.slots.filter(function (s) { return !std[s.time]; });
+				tr.appendChild(el('td', { class: 'scp-cal-extra' }, extras.length ? [el('div', { class: 'scp-cell-xlist' }, extras.map(function (s) { return cellBtn(s, true); }))] : []));
+			}
 			tr.appendChild(el('td', { class: 'scp-cal-sum' }, [cap ? el('span', { text: booked + '/' + cap }) : el('span', { class: 'scp-muted', text: '–' })]));
 			tb.appendChild(tr);
 		});

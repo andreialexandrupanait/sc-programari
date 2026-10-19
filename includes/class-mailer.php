@@ -261,7 +261,7 @@ class SCP_Mailer {
 		$rows = array(
 			'Data'   => SCP_Helpers::date_long( $b['slot_date'], true ),
 			'Ora'    => $b['slot_time'] . ' – ' . SCP_Helpers::dt( $b['slot_date'], $b['slot_time'] )->modify( '+' . (int) SCP_Settings::get( 'session_minutes', 60 ) . ' minutes' )->format( 'H:i' ),
-			'Pachet' => ( $packages[ $b['package'] ]['label'] ?? $b['package'] ) . ' · ' . SCP_Helpers::money( $b['price'] ) . ' lei' . ( $b['discount'] > 0 ? ' (în loc de ' . SCP_Helpers::money( $b['list_price'] ) . ')' : '' ),
+			'Pachet' => ( $packages[ $b['package'] ]['label'] ?? $b['package'] ) . ' · ' . ( 'free' === $b['payment_status'] ? 'oferit gratuit' : SCP_Helpers::money( $b['price'] ) . ' lei' . ( $b['discount'] > 0 ? ' (în loc de ' . SCP_Helpers::money( $b['list_price'] ) . ')' : '' ) ),
 			'Plată până' => 'pending' === $b['status'] && $b['pay_by'] ? SCP_Helpers::datetime_long( $b['pay_by'] ) : '',
 			'Unde'   => (string) SCP_Settings::get( 'studio_address' ),
 			'Cod'    => $b['code'],

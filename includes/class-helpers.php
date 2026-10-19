@@ -21,12 +21,13 @@ class SCP_Helpers {
 		'cash'      => 'Plătită cash la studio',
 		'card'      => 'Plătită cu cardul la studio',
 		'voucher'   => 'Plătită cu voucher',
+		'free'      => 'Gratuită (oferită)',
 	);
 
 	/** Statusurile de plată care înseamnă că ședința e achitată. */
-	const PAID = array( 'paid', 'cash', 'card', 'voucher' );
+	const PAID = array( 'paid', 'cash', 'card', 'voucher', 'free' );
 
-	/** Pentru SQL: 'paid','cash','card','voucher' (valori fixe, nu vin de la utilizator). */
+	/** Pentru SQL: 'paid','cash','card','voucher','free' (valori fixe, nu vin de la utilizator). */
 	public static function paid_sql(): string {
 		return "'" . implode( "','", self::PAID ) . "'";
 	}

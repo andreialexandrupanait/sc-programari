@@ -450,13 +450,13 @@ class SCP_Rest {
 	}
 
 	/**
-	 * Programarea rapidă (telefon / mesaje). pay: online | studio | voucher.
+	 * Programarea rapidă (telefon / mesaje). pay: online | studio | voucher | free (oferită gratuit).
 	 * Online = ca pe site: așteaptă plata în termenul din setări, apoi expiră.
 	 * Studio = confirmată direct, se încasează la studio cash sau card.
 	 */
 	public static function admin_quick( WP_REST_Request $req ): WP_REST_Response {
 		$p   = (array) ( $req->get_json_params() ?: $req->get_body_params() );
-		$pay = in_array( $p['pay'] ?? '', array( 'online', 'studio', 'voucher' ), true ) ? $p['pay'] : 'online';
+		$pay = in_array( $p['pay'] ?? '', array( 'online', 'studio', 'voucher', 'free' ), true ) ? $p['pay'] : 'online';
 
 		if ( '' === trim( (string) ( $p['phone'] ?? '' ) ) ) {
 			return self::error( new WP_Error( 'scp_invalid', 'Verifică datele.', array( 'status' => 422, 'fields' => array( 'phone' => 'Telefonul e necesar pentru SMS-uri.' ) ) ) );
@@ -476,6 +476,7 @@ class SCP_Rest {
 			'notes'           => $p['notes'] ?? '',
 			'voucher'         => 'voucher' === $pay ? ( $p['voucher'] ?? '' ) : '',
 			'require_payment' => 'online' === $pay,
+			'payment_status'  => 'free' === $pay ? 'free' : '',
 		);
 		$b = SCP_Bookings::create( $data, 'phone', 'studio' === $pay ? array( 'pay_at' => 'studio' ) : array() );
 		if ( is_wp_error( $b ) ) {
@@ -535,8 +536,8 @@ class SCP_Rest {
 			'time'         => $b['slot_time'],
 			'when'         => SCP_Helpers::date_long( $b['slot_date'] ) . ', ora ' . $b['slot_time'],
 			'package'      => $e['package_label'],
-			'price'        => SCP_Helpers::money( $b['price'] ) . ' lei',
-			'discount'     => (float) $b['discount'] > 0 ? SCP_Helpers::money( $b['discount'] ) . ' lei din ' . SCP_Helpers::money( $b['list_price'] ) . ' lei' : '',
+			'price'        => 'free' === $b['payment_status'] ? 'oferit gratuit (valoare ' . SCP_Helpers::money( $b['list_price'] ) . ' lei)' : SCP_Helpers::money( $b['price'] ) . ' lei',
+			'discount'     => (float) $b['discount'] > 0 && 'free' !== $b['payment_status'] ? SCP_Helpers::money( $b['discount'] ) . ' lei din ' . SCP_Helpers::money( $b['list_price'] ) . ' lei' : '',
 			'voucher'      => 'gift' === $b['discount_source'] ? $b['discount_code'] : '',
 			'pay'          => SCP_Bookings::pay_state( $b ),
 			'status'       => $b['status'],

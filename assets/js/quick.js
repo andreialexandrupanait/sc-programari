@@ -263,6 +263,8 @@
 			}
 		} else if (b.pay === 'studio') {
 			lines.push(el('p', { text: 'Confirmată. Plata (' + b.price + ' lei) se face la studio, cash sau card.' }));
+		} else if (b.pay === 'free') {
+			lines.push(el('p', { text: 'Confirmată, gratuită (oferită de voi).' }));
 		} else {
 			lines.push(el('p', { text: 'Confirmată și plătită cu voucher.' }));
 		}

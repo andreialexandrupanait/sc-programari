@@ -90,6 +90,7 @@ class SCP_Webhook {
 		'cash'     => 'Plătită cash la studio',
 		'card'     => 'Plătită cu cardul la studio',
 		'voucher'  => 'Plătită cu voucher',
+		'free'     => 'Gratuită (oferită)',
 		'awaiting' => 'Așteaptă plata online',
 		'studio'   => 'Plată la studio',
 		'unpaid'   => 'Neplătită',

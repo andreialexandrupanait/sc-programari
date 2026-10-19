@@ -66,6 +66,7 @@ class SCP_Bookings {
 			'cash'    => array( 'paid', 'Plătită cash la studio', 'Plătită cash' ),
 			'card'    => array( 'paid', 'Plătită cu cardul la studio', 'Plătită card' ),
 			'voucher' => array( 'paid', 'Plătită cu voucher', 'Voucher' ),
+			'free'    => array( 'free', 'Gratuită (oferită)', 'Gratuită' ),
 		);
 		if ( isset( $map[ $b['payment_status'] ] ) ) {
 			[ $key, $label, $short ] = $map[ $b['payment_status'] ];
@@ -242,6 +243,11 @@ class SCP_Bookings {
 		if ( $admin && isset( $in['payment_status'] ) && in_array( $in['payment_status'], SCP_Helpers::PAID, true ) ) {
 			$needs_pay = false;
 		}
+		// Ședință oferită gratuit (doar din admin): confirmată, preț 0, valoarea pachetului rămâne ca reducere.
+		$free = $admin && ! $voucher_id && 'free' === ( $in['payment_status'] ?? '' );
+		if ( $free ) {
+			$data = array_merge( $data, self::free_price( (float) $data['list_price'] ) );
+		}
 		$now  = SCP_Helpers::mysql_now();
 		$row  = array_merge(
 			$data,
@@ -249,8 +255,8 @@ class SCP_Bookings {
 				'active_slot'    => $data['slot_date'] . ' ' . $data['slot_time'],
 				'status'         => $needs_pay ? 'pending' : 'confirmed',
 				'pay_by'         => $needs_pay ? SCP_Pricing::pay_by( $data['slot_date'], $data['slot_time'] ) : null,
-				'payment_status' => $voucher_id ? 'voucher' : 'unpaid',
-				'paid_at'        => $voucher_id ? $now : null,
+				'payment_status' => $voucher_id ? 'voucher' : ( $free ? 'free' : 'unpaid' ),
+				'paid_at'        => $voucher_id || $free ? $now : null,
 				'source'         => array_key_exists( $source, SCP_Helpers::SOURCES ) ? $source : 'admin',
 				'notes'          => $admin ? trim( sanitize_textarea_field( $in['notes'] ?? '' ) ) : '',
 				'gdpr_at'        => $admin ? null : $now,
@@ -294,6 +300,17 @@ class SCP_Bookings {
 			SCP_Vouchers::release( $voucher_id );
 		}
 		return new WP_Error( 'scp_db', 'Programarea nu a putut fi salvată. Te rugăm să ne suni.', array( 'status' => 500 ) );
+	}
+
+	/** Prețul unei ședințe oferite gratuit: 0 lei, cu toată valoarea pachetului ca reducere. */
+	private static function free_price( float $list ): array {
+		return array(
+			'list_price'      => $list,
+			'discount'        => $list,
+			'discount_code'   => '',
+			'discount_source' => 'free',
+			'price'           => 0,
+		);
 	}
 
 	/** Câte programări neplătite, încă active, are același telefon sau email (pentru limita din formularul public). */
@@ -401,6 +418,10 @@ class SCP_Bookings {
 				}
 			}
 		}
+		// Din „gratuită” în altă stare de plată: prețul se calculează din nou.
+		if ( 'free' === $before['payment_status'] && isset( $changes['payment_status'] ) && 'free' !== $changes['payment_status'] ) {
+			$reprice = true;
+		}
 		if ( $reprice ) {
 			$created = new DateTimeImmutable( $before['created_at'], SCP_Helpers::tz() );
 			$q       = SCP_Pricing::quote( $pkg, $created );
@@ -421,6 +442,15 @@ class SCP_Bookings {
 				$set['discount_code']   = '';
 				$set['discount_source'] = 'manual';
 			}
+		}
+
+		// Gratuită: prețul e 0, iar valoarea pachetului rămâne în list_price (pentru „valoare oferită” din statistici).
+		if ( 'free' === ( $changes['payment_status'] ?? $before['payment_status'] ) && 'gift' !== ( $set['discount_source'] ?? $before['discount_source'] ) ) {
+			$list = (float) ( $set['list_price'] ?? $before['list_price'] );
+			if ( $list <= 0 ) {
+				$list = (float) ( $packages[ $pkg ]['price'] ?? 0 );
+			}
+			$set = array_merge( $set, self::free_price( $list ) );
 		}
 
 		$status = $before['status'];
@@ -887,6 +917,7 @@ class SCP_Bookings {
 		$last7     = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$t} WHERE created_at >= %s", $week ) );
 		$cancelled = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$t} WHERE status = 'cancelled'" );
 		$value     = (float) $wpdb->get_var( "SELECT COALESCE(SUM(price),0) FROM {$t} WHERE active_slot IS NOT NULL" );
+		$offered   = $wpdb->get_row( "SELECT COUNT(*) n, COALESCE(SUM(list_price),0) v FROM {$t} WHERE active_slot IS NOT NULL AND payment_status = 'free'", ARRAY_A );
 
 		$per_day = $wpdb->get_results(
 			$wpdb->prepare( "SELECT DATE(created_at) d, COUNT(*) n FROM {$t} WHERE created_at >= %s GROUP BY DATE(created_at) ORDER BY d", SCP_Helpers::now()->modify( '-29 days' )->format( 'Y-m-d 00:00:00' ) ),
@@ -951,6 +982,8 @@ class SCP_Bookings {
 			'last7'      => $last7,
 			'cancelled'  => $cancelled,
 			'value'      => $value,
+			'offered_n'  => (int) ( $offered['n'] ?? 0 ),
+			'offered_v'  => (float) ( $offered['v'] ?? 0 ),
 			'by_package' => $by_package,
 			'by_pay'     => $by_pay,
 			'by_source'  => $by_source,

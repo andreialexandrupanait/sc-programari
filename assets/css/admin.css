@@ -445,3 +445,19 @@
 /* Sub 600px bara WordPress nu mai e fixă: meniul setărilor se lipește de marginea de sus. */
 @media (max-width: 600px) { .scp-tabs { top: 0; } .scp-settings section { scroll-margin-top: 64px; } }
 @media (max-width: 782px) { .scp-pkg-add { min-height: 52px; } }
+
+/* Ore extra (adăugate într-o singură zi): o singură coloană, cu ora pe fiecare card */
+.scp-cal-table thead th.scp-cal-extrah { width: 112px; }
+.scp-cell-xlist { display: flex; flex-direction: column; gap: 4px; }
+.scp-cell--x { min-height: 0; padding: 4px 8px; }
+.scp-cell-time { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+.scp-cell--booked .scp-cell-time { color: inherit; opacity: .85; }
+
+/* Ședințe oferite gratuit: lila, ca să se distingă de cele plătite */
+.scp-cell--booked.pay-free { background: #ece6f7; border-color: #a893d6; color: #43307a; }
+.scp-cell--booked.pay-free .scp-cell-meta, .scp-cell--booked.pay-free .scp-cell-line { color: #5d4799; }
+.scp-cell--booked.pay-free:hover { background: #5d4799; border-color: #5d4799; color: #fff; }
+.scp-cell--booked.pay-free:hover .scp-cell-line { color: #e6defa; }
+.scp-badge--ps-free { background: #ece6f7; color: #4e3a8c; box-shadow: inset 0 0 0 1px #cfc2ec; }
+.scp-lg--gift::before { background: #ece6f7; border-color: #a893d6; }
+.scp-kpi-sub--free { color: #5d4799; }

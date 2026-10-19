@@ -45,6 +45,7 @@ class SCP_SMS {
 				'paid'        => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Plata a ajuns, sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'voucher'     => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata cu voucherul tau: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'studio'      => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun e confirmata: {ziua} {data}, ora {ora}, {adresa}. Plata la studio, cash sau card.' ),
+				'free'        => array( 'enabled' => 1, 'body' => 'Buna, {prenume}! Te-am trecut in program: {ziua} {data}, la {ora}, pe {adresa}. Te asteptam! - Stefan Chelmu' ),
 				'moved'       => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Sedinta foto de Craciun s-a mutat: {ziua} {data}, ora {ora}, {adresa}. Te asteptam!' ),
 				'remind_day'  => array( 'enabled' => 1, 'body' => 'Salut, {prenume}! Te asteptam maine, {ziua} {data}, la ora {ora}, la sedinta foto de Craciun. {adresa}. Info: {telefon_studio}' ),
 				'remind_hour' => array( 'enabled' => 1, 'body' => 'Ne vedem intr-o ora, la {ora}, la sedinta foto de Craciun. {adresa}. Daca intarzii, suna-ne la {telefon_studio}.' ),
@@ -334,7 +335,7 @@ class SCP_SMS {
 		}
 		$t = self::get( 'templates' );
 		if ( 'paid' === $type ) {
-			return ! empty( $t['paid']['enabled'] ) || ! empty( $t['voucher']['enabled'] ) || ! empty( $t['studio']['enabled'] );
+			return ! empty( $t['paid']['enabled'] ) || ! empty( $t['voucher']['enabled'] ) || ! empty( $t['studio']['enabled'] ) || ! empty( $t['free']['enabled'] );
 		}
 		return ! empty( $t[ $type ]['enabled'] );
 	}
@@ -483,6 +484,8 @@ class SCP_SMS {
 		$key = $type;
 		if ( 'paid' === $type && 'voucher' === $b['payment_status'] ) {
 			$key = 'voucher';
+		} elseif ( 'paid' === $type && 'free' === $b['payment_status'] ) {
+			$key = 'free';
 		} elseif ( 'paid' === $type && ! empty( $b['status'] ) && SCP_Bookings::pays_at_studio( $b ) ) {
 			$key = 'studio';
 		}
@@ -945,6 +948,7 @@ class SCP_SMS {
 		'paid'        => 'Plată primită',
 		'voucher'     => 'Rezervare cu voucher',
 		'studio'      => 'Plata la studio',
+		'free'        => 'Ședință gratuită',
 		'moved'       => 'Mutare',
 		'remind_day'  => 'Cu o zi înainte',
 		'remind_hour' => 'Cu o oră înainte',
@@ -964,7 +968,7 @@ class SCP_SMS {
 		$tpls  = self::get( 'templates' );
 		$out   = array();
 		foreach ( self::SAMPLES as $key => $label ) {
-			$b    = array_merge( self::sample_booking(), array( 'phone' => $to ), 'voucher' === $key ? array( 'payment_status' => 'voucher' ) : array() );
+			$b    = array_merge( self::sample_booking(), array( 'phone' => $to ), in_array( $key, array( 'voucher', 'free' ), true ) ? array( 'payment_status' => $key ) : array() );
 			$text = self::render( (string) ( $tpls[ $key ]['body'] ?? '' ), $b );
 			if ( '' === $text ) {
 				continue;
